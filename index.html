@@ -8,124 +8,206 @@
 <body>
 <title>Philology</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<meta name="description" content="Which language model wrote this text? A terminal-style tool built from the CompLLM, LangLLM and WLLFM studies.">
+<meta name="description" content="Which language model wrote this text? Paste a text and Philology names the most likely author out of nine models, shows how reliable that is, and what in the text gave it away.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap">
 <style>
-/* A terminal. One monospace face, one dark screen, plain text output.
-   Colour only where a terminal would use it: dim for secondary text,
-   bold for the answer, green/red for right/wrong, yellow for evidence. */
+/* A terminal you can read. One monospace face on a dark screen. Every output
+   field carries a dim "# comment" that says what it means, so the page
+   explains itself. Colour only where a terminal would use it: white bold for
+   answers, yellow for evidence, green/red for right/wrong, cyan for links. */
 :root {
   color-scheme: dark;
-  --bg: #0c0c0c;
-  --fg: #d0d0d0;
-  --dim: #7a7a7a;
-  --faint: #2a2a2a;
+  --bg: #0d0d0d;
+  --panel: #131313;
+  --fg: #d4d4d4;
+  --dim: #808080;
+  --faint: #262626;
   --bold: #ffffff;
   --yellow: #e5c07b;
   --green: #98c379;
   --red: #e06c75;
-  --cyan: #56b6c2;
+  --cyan: #61afef;
   --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 }
 * { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 56px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 html, body { overflow-x: clip; }
 body {
-  background: var(--bg); color: var(--fg); font: 14px/1.6 var(--mono); margin: 0;
+  background: var(--bg); color: var(--fg); font: 14px/1.7 var(--mono); margin: 0;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: 20px 48px;
+  padding-block: 0 64px;
 }
-.term { max-width: 920px; margin: 0 auto; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.term { max-width: 960px; margin: 0 auto; }
 a { color: var(--cyan); text-decoration: none; }
 a:hover { text-decoration: underline; }
 :focus-visible { outline: 1px solid var(--fg); outline-offset: 2px; }
+p { margin: 0; max-width: 78ch; }
 .dim { color: var(--dim); }
 .b { color: var(--bold); font-weight: 700; }
 .y { color: var(--yellow); }
 .g { color: var(--green); }
 .r { color: var(--red); }
-.line { white-space: pre-wrap; overflow-wrap: anywhere; min-height: 1.6em; }
 .pre { white-space: pre; overflow-x: auto; }
-.gap { height: 1.6em; }
-hr { border: 0; border-top: 1px solid var(--faint); margin: 12px 0; }
 
-nav { display: flex; flex-wrap: wrap; gap: 4px 18px; }
-nav button { font: inherit; color: var(--dim); background: none; border: 0; padding: 0; cursor: pointer; }
-nav button:hover { color: var(--fg); }
-nav button[aria-current="page"] { color: var(--bg); background: var(--fg); padding: 0 4px; }
+/* top bar */
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--faint);
+  margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px))); padding-inline: max(16px, env(safe-area-inset-left, 0px)); }
+.bar .term { display: flex; flex-wrap: wrap; gap: 4px 22px; align-items: center; min-height: 46px; padding-block: 8px; }
+.bar .name { color: var(--bold); font-weight: 700; margin-right: auto; }
+.bar a { color: var(--dim); }
+.bar a:hover { color: var(--fg); text-decoration: none; }
 
-.opts { display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: center; }
+/* sections */
+section { padding-top: 56px; }
+h2 { font: 700 14px/1.7 var(--mono); color: var(--bold); margin: 0 0 16px; }
+h2::before { content: "## "; color: var(--dim); font-weight: 400; }
+h3 { font: 700 14px/1.7 var(--mono); color: var(--bold); margin: 0; }
+.lead { margin-bottom: 18px; }
+.stack { display: grid; gap: 14px; }
+
+/* intro */
+.intro { padding-top: 48px; display: grid; gap: 14px; }
+.intro .cmd { color: var(--dim); }
+.intro .big { color: var(--bold); font-size: clamp(18px, 2.6vw, 22px); line-height: 1.45; font-weight: 700; max-width: 40ch; }
+
+/* input */
+.opts { display: flex; flex-wrap: wrap; gap: 6px 20px; align-items: center; }
 .opts button, .opts label.btn { font: inherit; color: var(--dim); background: none; border: 0; padding: 0; cursor: pointer; }
 .opts button:hover, .opts label.btn:hover { color: var(--fg); }
-.opts button[aria-pressed="true"] { color: var(--fg); }
-.opts button[aria-pressed="true"]::before { content: "[x] "; }
-.opts button[aria-pressed="false"]::before { content: "[ ] "; }
-select { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--faint); padding: 1px 4px; max-width: 100%; }
-
+.opts button[aria-pressed="true"] { color: var(--bold); }
+.opts button[aria-pressed]::before { content: "( ) "; color: var(--dim); }
+.opts button[aria-pressed="true"]::before { content: "(•) "; color: var(--bold); }
+select { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--faint); padding: 2px 6px; max-width: 100%; }
 textarea {
-  display: block; width: 100%; min-height: 260px; resize: vertical; margin: 8px 0 4px; padding: 10px 12px;
-  font: 13.5px/1.6 var(--mono); color: var(--fg); background: #111; border: 1px solid var(--faint); border-radius: 0;
+  display: block; width: 100%; min-height: 240px; resize: vertical; margin: 0; padding: 12px 14px;
+  font: 13.5px/1.65 var(--mono); color: var(--fg); background: var(--panel); border: 1px solid var(--faint); border-radius: 0;
 }
-textarea:focus { outline: none; border-color: #555; }
+textarea:focus { outline: none; border-color: #4a4a4a; }
 textarea.drag { border-color: var(--yellow); }
+.count { color: var(--dim); }
+
+/* annotated output: field | value | # comment */
+.out { border-top: 1px solid var(--faint); padding-top: 16px; display: grid; gap: 10px; }
+.row { display: grid; grid-template-columns: 16ch minmax(0, 1fr) minmax(0, 0.95fr); gap: 2px 20px; align-items: baseline; }
+.row > .k { color: var(--dim); }
+.row > .v { min-width: 0; overflow-wrap: anywhere; }
+.row > .c { color: var(--dim); min-width: 0; }
+.row > .c::before { content: "# "; }
+.row > .full { grid-column: 2 / -1; min-width: 0; }
+@media (max-width: 760px) {
+  .row { grid-template-columns: minmax(0, 1fr); }
+  .row > .k { color: var(--fg); font-weight: 700; }
+  .row > .full { grid-column: auto; }
+}
+.ranks { white-space: pre; overflow-x: auto; }
+.grams { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.print { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 300px; overflow: auto; background: var(--panel); border: 1px solid var(--faint);
+  padding: 10px 12px; font-size: 13px; line-height: 1.65; color: #9a9a9a; }
+.print .h1 { color: #c9b48a; }
+.print .h2 { color: #d8bd84; background: rgba(229, 192, 123, .10); }
+.print .h3 { color: #e5c07b; background: rgba(229, 192, 123, .20); }
+.print .h4 { color: #0d0d0d; background: #e5c07b; }
 details > summary { cursor: pointer; color: var(--dim); list-style: none; }
 details > summary::-webkit-details-marker { display: none; }
-details > summary::before { content: "+ "; }
-details[open] > summary::before { content: "- "; }
+details > summary::before { content: "[+] "; }
+details[open] > summary::before { content: "[-] "; }
 details > summary:hover { color: var(--fg); }
+details[open] > summary { margin-bottom: 8px; }
+
+/* how it works */
+.steps { display: grid; gap: 18px; }
+.step { display: grid; grid-template-columns: 4ch minmax(0, 1fr); gap: 0 12px; }
+.step .n { color: var(--dim); }
+.step .t { display: grid; gap: 6px; min-width: 0; }
+.box { border: 1px solid var(--faint); background: var(--panel); padding: 14px 16px; }
+.tbl { white-space: pre; overflow-x: auto; }
+.note { color: var(--dim); }
+.methods { display: grid; gap: 20px; }
+.method { display: grid; grid-template-columns: 16ch minmax(0, 1fr); gap: 4px 20px; }
+@media (max-width: 760px) { .method, .step { grid-template-columns: minmax(0, 1fr); } }
+.method .t { display: grid; gap: 4px; min-width: 0; }
+footer { margin-top: 64px; padding-top: 18px; border-top: 1px solid var(--faint); color: var(--dim); display: grid; gap: 6px; }
 </style>
 
-<div class="term">
-  <div class="line"><span class="b">philology</span> <span class="dim">0.1, which model wrote this text? private preview</span></div>
-  <nav aria-label="Commands">
-    <button type="button" data-tab="attribute" aria-current="page">attribute</button>
-    <button type="button" data-tab="results">results</button>
-    <button type="button" data-tab="methods">methods</button>
-    <button type="button" data-tab="code">code</button>
-  </nav>
-  <hr>
+<header class="bar">
+  <div class="term">
+    <span class="name">philology</span>
+    <a href="#try">try</a><a href="#how">how it works</a><a href="#results">results</a><a href="#methods">other methods</a><a href="#code">code</a>
+  </div>
+</header>
 
-  <!-- ============================================================ attribute -->
-  <section id="attribute">
-    <div class="line"><span class="dim">$</span> philology attribute <span class="dim" id="flags"></span></div>
+<main class="term">
+  <div class="intro">
+    <span class="cmd">$ philology --help</span>
+    <p class="big">Which language model wrote this text?</p>
+    <p>Paste a text. Philology compares it with 2,589 texts written by nine models and tells you whose writing it most resembles, how often that call has been right, and which parts of your text gave it away. It runs entirely in your browser; your text is never sent anywhere.</p>
+  </div>
+
+  <!-- ===================================================== try -->
+  <section id="try" class="stack">
+    <h2>try</h2>
     <div class="opts">
-      <span class="dim">panel:</span>
-      <button type="button" id="p-frontier" aria-pressed="true">frontier (5 models)</button>
-      <button type="button" id="p-openweight" aria-pressed="false">open-weight (4 models)</button>
+      <span class="dim">compare against:</span>
+      <button type="button" id="p-frontier" aria-pressed="true">frontier models (5)</button>
+      <button type="button" id="p-openweight" aria-pressed="false">open-weight models (4)</button>
     </div>
+    <div class="dim" id="panel-desc"></div>
     <div class="opts">
-      <label class="dim" for="sample">sample:</label>
+      <label class="dim" for="sample">load a sample:</label>
       <select id="sample"></select>
-      <label class="btn" for="file">upload .txt</label>
+      <label class="btn" for="file">[upload .txt]</label>
       <input id="file" type="file" accept=".txt,.md,text/plain" hidden>
-      <button type="button" id="clear">clear</button>
+      <button type="button" id="clear">[clear]</button>
     </div>
-    <label for="text" class="dim" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Text to attribute</label>
-    <textarea id="text" spellcheck="false" placeholder="paste text here, or drop a .txt file"></textarea>
-    <div class="line dim" id="count"></div>
-    <div class="gap"></div>
-    <div id="out"></div>
+    <label for="text" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Text to attribute</label>
+    <textarea id="text" spellcheck="false" placeholder="paste any text here, or drop a .txt file"></textarea>
+    <div class="count" id="count"></div>
+    <div class="out" id="out" aria-live="polite"></div>
   </section>
 
-  <!-- ============================================================ results -->
-  <section id="results" hidden>
-    <div class="line"><span class="dim">$</span> philology results</div>
-    <div id="res"></div>
+  <!-- ===================================================== how -->
+  <section id="how">
+    <h2>how it works</h2>
+    <p class="lead">The verdict comes from a character n-gram classifier: it learns which short character sequences each model uses more or less than the others, then weighs those sequences in your text.</p>
+    <div class="box pre" style="margin-bottom:22px"><span class="b">your text</span>              <span class="dim">"…the model says, …"</span>
+  <span class="dim">↓</span> cut into every 1–4 character sequence     <span class="dim">"s"  "sa"  "say"  "ays,"  "s, "  …</span>
+  <span class="dim">↓</span> weight each one by tf-idf                 <span class="dim">40,000 numbers</span>
+  <span class="dim">↓</span> multiply by each model's learned weights  <span class="dim">one score per model</span>
+  <span class="dim">↓</span> softmax                                   <span class="dim">probabilities that add up to 1</span>
+<span class="b">verdict</span>                <span class="dim">the model with the highest probability</span></div>
+    <div class="steps" id="steps"></div>
   </section>
 
-  <!-- ============================================================ methods -->
-  <section id="methods" hidden>
-    <div class="line"><span class="dim">$</span> philology methods</div>
-    <div id="meth"></div>
+  <!-- ===================================================== results -->
+  <section id="results">
+    <h2>results</h2>
+    <p class="lead">What the three studies found. Every accuracy is measured on prompts the method never saw.</p>
+    <div class="stack" id="res"></div>
   </section>
 
-  <!-- ============================================================ code -->
-  <section id="code" hidden>
-    <div class="line"><span class="dim">$</span> philology code</div>
-    <div id="files"></div>
+  <!-- ===================================================== methods -->
+  <section id="methods">
+    <h2>other methods</h2>
+    <p class="lead">This page runs the two text-only classifiers. The research tested four other approaches. The two strongest need the models themselves and a GPU, so they run from the repository, not in a browser.</p>
+    <div class="methods" id="meth"></div>
   </section>
-</div>
+
+  <!-- ===================================================== code -->
+  <section id="code">
+    <h2>code</h2>
+    <p class="lead">Where each method is implemented. <span class="dim">The repository is private for now; links work for collaborators.</span></p>
+    <div class="tbl" id="files"></div>
+  </section>
+
+  <footer>
+    <span><span class="b">philology</span> v0.1, October 2026. Built from the CompLLM, LangLLM and WLLFM studies.</span>
+    <span>Adrian Erlikhman, Michael Tarekegn, Philo Juang.</span>
+  </footer>
+</main>
 
 <script id="results-data" type="application/json">{"likelihood":{"source":"self-recognition-peer-baseline/results/revision/openweight/likelihood.csv","labels":["Qwen","Llama","Mistral","Phi"],"with_prompt":{"n":480,"raw":{"acc":1.0,"confusion":[[120,0,0,0],[0,120,0,0],[0,0,120,0],[0,0,0,120]]},"zscore":{"acc":0.998,"confusion":[[120,0,0,0],[0,119,0,1],[0,0,120,0],[0,0,0,120]]}},"text_only":{"n":480,"raw":{"acc":0.84,"confusion":[[118,0,2,0],[4,107,9,0],[0,0,120,0],[22,0,40,58]]},"zscore":{"acc":0.95,"confusion":[[114,0,2,4],[2,117,0,1],[0,0,120,0],[5,0,10,105]]}}},"probes":{"source":"legacy/compllm/results/wllfm/probe_summary.json (+ _w32)","readers":["Qwen","Llama","Mistral","Phi"],"full":{"acc4":{"Qwen":0.87,"Llama":0.848,"Mistral":0.841,"Phi":0.865},"self_vs_peer":{"Qwen":{"self":0.975,"strongest_peer":"Phi","strongest_peer_auc":0.975,"p_holm":1.0},"Llama":{"self":0.961,"strongest_peer":"Qwen","strongest_peer_auc":0.983,"p_holm":1.0},"Mistral":{"self":0.97,"strongest_peer":"Phi","strongest_peer_auc":0.974,"p_holm":1.0},"Phi":{"self":0.935,"strongest_peer":"Llama","strongest_peer_auc":0.923,"p_holm":0.448}},"auc_matrix":{"Qwen":{"Qwen":0.9747858796296297,"Llama":0.9827951388888889,"Mistral":0.9681655092592591,"Phi":0.9182581018518519},"Llama":{"Qwen":0.9630844907407408,"Llama":0.9613368055555556,"Mistral":0.9699479166666667,"Phi":0.9229918981481482},"Mistral":{"Qwen":0.9698900462962963,"Llama":0.9790104166666667,"Mistral":0.9700520833333333,"Phi":0.9029513888888889},"Phi":{"Qwen":0.9750694444444444,"Llama":0.9808564814814814,"Mistral":0.9739293981481482,"Phi":0.9348784722222222}},"best_layer":{"Qwen":11,"Llama":5,"Mistral":12,"Phi":13}},"first_32_words":{"acc4":{"Qwen":0.621,"Llama":0.651,"Mistral":0.599,"Phi":0.615},"self_vs_peer":{"Qwen":{"self":0.784,"strongest_peer":"Llama","strongest_peer_auc":0.808,"p_holm":1.0},"Llama":{"self":0.829,"strongest_peer":"Phi","strongest_peer_auc":0.838,"p_holm":1.0},"Mistral":{"self":0.877,"strongest_peer":"Llama","strongest_peer_auc":0.893,"p_holm":1.0},"Phi":{"self":0.821,"strongest_peer":"Llama","strongest_peer_auc":0.824,"p_holm":1.0}},"auc_matrix":{"Qwen":{"Qwen":0.7844733796296296,"Llama":0.8339293981481481,"Mistral":0.8778182870370371,"Phi":0.8051909722222222},"Llama":{"Qwen":0.8077256944444445,"Llama":0.8292939814814815,"Mistral":0.8929282407407408,"Phi":0.8235937499999999},"Mistral":{"Qwen":0.7695312499999999,"Llama":0.801238425925926,"Mistral":0.8768229166666667,"Phi":0.8173553240740741},"Phi":{"Qwen":0.7931192129629631,"Llama":0.8375347222222222,"Mistral":0.8792534722222223,"Phi":0.8213310185185185}},"best_layer":{"Qwen":10,"Llama":5,"Mistral":6,"Phi":6}},"text_baselines_acc4":{"char_1_5":0.771,"word_punct_1_2":0.74}},"steering":{"source":"legacy/compllm/results/wllfm/steer2_summary.json","unit":"change in log-odds of Yes per unit of k, late layer, all texts","judges":{"Qwen":{"author":-0.442,"yes_control":1.0,"null_lo":-0.271,"null_hi":0.276,"p_author":0.01,"layer":27},"Llama":{"author":0.059,"yes_control":0.24,"null_lo":-0.093,"null_hi":0.058,"p_author":0.109,"layer":31},"Mistral":{"author":-0.482,"yes_control":0.993,"null_lo":-0.306,"null_hi":0.311,"p_author":0.02,"layer":31},"Phi":{"author":0.043,"yes_control":0.27,"null_lo":-0.139,"null_hi":0.122,"p_author":0.554,"layer":31}}},"langllm":{"source":"LangLLM/results/{rq1_accuracy,rq7_ngram_accuracy,rq6_judge_by_language,rq6_judge_summary}.csv","chance":0.2,"by_language":[{"lang":"en","name":"English","rank":1,"features":0.717,"char_ngram":0.75,"word_ngram":0.783,"judge_mean":0.23,"judge_best":0.267},{"lang":"es","name":"Spanish","rank":2,"features":0.625,"char_ngram":0.733,"word_ngram":0.783,"judge_mean":0.207,"judge_best":0.217},{"lang":"zh","name":"Chinese","rank":3,"features":0.65,"char_ngram":0.867,"word_ngram":0.558,"judge_mean":0.208,"judge_best":0.233},{"lang":"ru","name":"Russian","rank":4,"features":0.65,"char_ngram":0.783,"word_ngram":0.825,"judge_mean":0.237,"judge_best":0.258},{"lang":"ja","name":"Japanese","rank":5,"features":0.708,"char_ngram":0.792,"word_ngram":0.683,"judge_mean":0.198,"judge_best":0.225},{"lang":"tr","name":"Turkish","rank":6,"features":0.592,"char_ngram":0.783,"word_ngram":0.833,"judge_mean":0.205,"judge_best":0.258},{"lang":"hi","name":"Hindi","rank":7,"features":0.639,"char_ngram":0.782,"word_ngram":0.731,"judge_mean":0.247,"judge_best":0.361}],"judges":[{"judge":"claude","acc":0.254,"self_claim_rate":0.087},{"judge":"grok","acc":0.219,"self_claim_rate":0.001},{"judge":"gemini","acc":0.212,"self_claim_rate":0.041},{"judge":"gpt","acc":0.206,"self_claim_rate":0.824},{"judge":"deepseek","acc":0.203,"self_claim_rate":0.079}]},"study1":{"source":"self-recognition-peer-baseline/results/{engine_a_results,engine_b_results}.json, results/revision/openweight/{classifier,summary}.json","style_rf_frontier":{"acc":0.863,"n":190,"length_share":0.631},"style_rf_openweight":{"pooled":0.725,"prose":0.858,"code":0.775,"short":0.625,"math":0.463},"judges_frontier":{"lineup":0.337,"single":0.306,"chance":0.2},"judges_openweight_yesno_auc":{"Qwen":0.449,"Llama":0.528,"Mistral":0.412,"Phi":0.53}}}</script>
 <script id="eval-data" type="application/json">{"frontier_ngram":{"overall":{"n":1629,"acc":0.8134},"chance":0.2,"by_source":{"api":{"n":600,"acc":0.79},"chat-app":{"n":190,"acc":0.8895},"langllm":{"n":839,"acc":0.8129}},"by_lang":{"en":{"n":910,"acc":0.8187},"es":{"n":120,"acc":0.75},"hi":{"n":119,"acc":0.8403},"ja":{"n":120,"acc":0.8083},"ru":{"n":120,"acc":0.775},"tr":{"n":120,"acc":0.775},"zh":{"n":120,"acc":0.8917}},"by_genre":{"code":{"n":100,"acc":0.65},"essay":{"n":839,"acc":0.8129},"math":{"n":100,"acc":0.82},"prose":{"n":490,"acc":0.9367},"short":{"n":100,"acc":0.37}},"by_length_chars":[{"lo":0,"hi":400,"n":84,"acc":0.5476},{"lo":400,"hi":800,"n":210,"acc":0.6714},{"lo":800,"hi":1600,"n":315,"acc":0.8476},{"lo":1600,"hi":3200,"n":806,"acc":0.8449},{"lo":3200,"hi":1000000000,"n":214,"acc":0.8879}],"calibration":[{"lo":0,"hi":0.4,"n":555,"acc":0.6036},{"lo":0.4,"hi":0.6,"n":601,"acc":0.8769},{"lo":0.6,"hi":0.8,"n":351,"acc":0.9715},{"lo":0.8,"hi":0.9,"n":97,"acc":1.0},{"lo":0.9,"hi":1.0,"n":25,"acc":1.0}],"confusion":{"labels":["GPT","Claude","Gemini","Grok","DeepSeek"],"matrix":[[277,12,3,20,14],[8,275,7,18,18],[6,9,278,13,20],[12,5,5,296,7],[29,46,25,27,199]]}},"frontier_style":{"overall":{"n":910,"acc":0.5714},"chance":0.2,"by_source":{"api":{"n":600,"acc":0.5683},"chat-app":{"n":190,"acc":0.6632},"langllm":{"n":120,"acc":0.4417}},"by_genre":{"code":{"n":100,"acc":0.51},"essay":{"n":120,"acc":0.4417},"math":{"n":100,"acc":0.45},"prose":{"n":490,"acc":0.6959},"short":{"n":100,"acc":0.3}},"by_length_chars":[{"lo":0,"hi":400,"n":84,"acc":0.3571},{"lo":400,"hi":800,"n":129,"acc":0.4574},{"lo":800,"hi":1600,"n":138,"acc":0.6377},{"lo":1600,"hi":3200,"n":362,"acc":0.6243},{"lo":3200,"hi":1000000000,"n":197,"acc":0.5939}],"calibration":[{"lo":0,"hi":0.4,"n":198,"acc":0.4242},{"lo":0.4,"hi":0.6,"n":405,"acc":0.5086},{"lo":0.6,"hi":0.8,"n":189,"acc":0.6561},{"lo":0.8,"hi":0.9,"n":53,"acc":0.8491},{"lo":0.9,"hi":1.0,"n":65,"acc":0.9385}],"confusion":{"labels":["GPT","Claude","Gemini","Grok","DeepSeek"],"matrix":[[113,25,19,14,11],[31,99,17,15,20],[13,13,108,20,28],[12,6,13,143,8],[28,43,39,15,57]]}},"openweight_ngram":{"overall":{"n":960,"acc":0.7688},"chance":0.25,"by_genre":{"code":{"n":160,"acc":0.8375},"math":{"n":160,"acc":0.7},"prose":{"n":480,"acc":0.8729},"short":{"n":160,"acc":0.4562}},"by_length_chars":[{"lo":0,"hi":400,"n":77,"acc":0.4286},{"lo":400,"hi":800,"n":169,"acc":0.6391},{"lo":800,"hi":1600,"n":200,"acc":0.78},{"lo":1600,"hi":3200,"n":462,"acc":0.8636},{"lo":3200,"hi":1000000000,"n":52,"acc":0.8077}],"calibration":[{"lo":0,"hi":0.4,"n":170,"acc":0.4647},{"lo":0.4,"hi":0.6,"n":407,"acc":0.7322},{"lo":0.6,"hi":0.8,"n":329,"acc":0.9331},{"lo":0.8,"hi":0.9,"n":46,"acc":1.0},{"lo":0.9,"hi":1.0,"n":8,"acc":1.0}],"confusion":{"labels":["Qwen","Llama","Mistral","Phi"],"matrix":[[185,17,7,31],[7,196,31,6],[7,25,198,10],[41,16,24,159]]}},"openweight_style":{"overall":{"n":960,"acc":0.6052},"chance":0.25,"by_genre":{"code":{"n":160,"acc":0.5375},"math":{"n":160,"acc":0.3187},"prose":{"n":480,"acc":0.7875},"short":{"n":160,"acc":0.4125}},"by_length_chars":[{"lo":0,"hi":400,"n":77,"acc":0.5584},{"lo":400,"hi":800,"n":169,"acc":0.3609},{"lo":800,"hi":1600,"n":200,"acc":0.45},{"lo":1600,"hi":3200,"n":462,"acc":0.7489},{"lo":3200,"hi":1000000000,"n":52,"acc":0.7885}],"calibration":[{"lo":0,"hi":0.4,"n":140,"acc":0.3714},{"lo":0.4,"hi":0.6,"n":463,"acc":0.5572},{"lo":0.6,"hi":0.8,"n":246,"acc":0.7154},{"lo":0.8,"hi":0.9,"n":66,"acc":0.8485},{"lo":0.9,"hi":1.0,"n":45,"acc":0.8667}],"confusion":{"labels":["Qwen","Llama","Mistral","Phi"],"matrix":[[163,23,25,29],[28,136,34,42],[18,42,154,26],[36,32,44,128]]}}}</script>
@@ -350,36 +432,28 @@ details > summary:hover { color: var(--fg); }
   "use strict";
   const $ = (s) => document.querySelector(s);
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  const pct = (x, d = 1) => (x == null ? "-" : (100 * x).toFixed(d) + "%");
+  const pct = (x, d = 0) => (x == null ? "-" : (100 * x).toFixed(d) + "%");
   const pad = (s, n) => String(s).padEnd(n);
   const lpad = (s, n) => String(s).padStart(n);
-  const bar = (p, w = 30) => { const k = Math.round(p * w); return "█".repeat(k) + "░".repeat(w - k); };
+  const bar = (p, w = 28) => { const k = Math.round(p * w); return "█".repeat(k) + "░".repeat(w - k); };
   const RES = JSON.parse($("#results-data").textContent);
   const EVAL = JSON.parse($("#eval-data").textContent);
   const SAMPLES = JSON.parse($("#samples-data").textContent);
   const REPO = "https://github.com/adrian-erlikhman/llm-attribution/blob/main/";
-  const LANG = { en: "english", es: "spanish", ja: "japanese", zh: "chinese", ru: "russian", tr: "turkish", hi: "hindi" };
-  const TABS = ["attribute", "results", "methods", "code"];
+  const LANG = { en: "English", es: "Spanish", ja: "Japanese", zh: "Chinese", ru: "Russian", tr: "Turkish", hi: "Hindi" };
+  const PANEL = {
+    frontier: "GPT-5.5, Claude Opus 4.7, Gemini 3.5 Flash, Grok 4.3, DeepSeek. 1,629 training texts in 7 languages.",
+    openweight: "Qwen2.5-7B, Llama-3.1-8B, Mistral-7B, Phi-4-mini, run locally in 4-bit. 960 training texts in English.",
+  };
   const models = {};
   const st = { panel: "frontier", sample: 0 };
-  const line = (html, cls = "") => `<div class="line ${cls}">${html}</div>`;
-  const pre = (html) => `<div class="pre">${html}</div>`;
-  const gap = `<div class="gap"></div>`;
-
-  // ------------------------------------------------------------ commands
-  const tabs = [...document.querySelectorAll("nav button")];
-  function show(id) {
-    tabs.forEach((t) => (t.dataset.tab === id ? t.setAttribute("aria-current", "page") : t.removeAttribute("aria-current")));
-    TABS.forEach((s) => ($("#" + s).hidden = s !== id));
-    try { history.replaceState(null, "", "#" + id); } catch (e) {}
-  }
-  tabs.forEach((t) => t.addEventListener("click", () => show(t.dataset.tab)));
-  if (TABS.includes(location.hash.slice(1))) show(location.hash.slice(1));
+  const row = (k, v, c) => `<div class="row"><span class="k">${k}</span><span class="v">${v}</span>${c ? `<span class="c">${c}</span>` : "<span></span>"}</div>`;
+  const rowFull = (k, v) => `<div class="row"><span class="k">${k}</span><div class="full">${v}</div></div>`;
 
   // ------------------------------------------------------------ input
   const ta = $("#text"), sel = $("#sample");
-  sel.innerHTML = `<option value="">none</option>` + SAMPLES.map((s, i) =>
-    `<option value="${i}">${esc(s.display)}, ${s.genre === "code" ? "code" : LANG[s.lang]}</option>`).join("");
+  sel.innerHTML = `<option value="">choose…</option>` + SAMPLES.map((s, i) =>
+    `<option value="${i}">${esc(s.display)}, ${s.genre === "code" ? "code" : LANG[s.lang] + " " + (s.genre === "prose" ? "essay" : s.genre)}</option>`).join("");
   function loadSample(i) {
     st.sample = i; sel.value = i == null ? "" : String(i);
     if (i != null) { st.panel = SAMPLES[i].panel; ta.value = SAMPLES[i].text; }
@@ -413,55 +487,75 @@ details > summary:hover { color: var(--fg); }
   const bucket = (list, v) => list.find((b) => v >= b.lo && v < b.hi) || list[list.length - 1];
   const fmt = (v) => (Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2));
 
-  function ranked(proba, names) {
+  function ranks(proba, names) {
     const order = proba.map((_, i) => i).sort((a, b) => proba[b] - proba[a]);
     const w = Math.max(...names.map((n) => n.length)) + 2;
     return order.map((i, r) => {
-      const row = `${pad(names[i], w)}${proba[i].toFixed(2)}  ${bar(proba[i])}`;
-      return r === 0 ? `<span class="b">${esc(row)}</span>` : esc(row);
+      const t = `${pad(names[i], w)}${proba[i].toFixed(2)}  ${bar(proba[i])}`;
+      return r === 0 ? `<span class="b">${esc(t)}</span>` : esc(t);
     }).join("\n");
+  }
+
+  function highlighted(text, ng, cls) {
+    const { chars, weights } = Attribution.fingerprint(text, ng, cls);
+    const pos = Array.from(weights).filter((w) => w > 0).sort((a, b) => a - b);
+    const cap = pos.length ? pos[Math.floor(pos.length * 0.97)] || pos[pos.length - 1] : 1;
+    const level = (w) => (w <= 0 ? 0 : Math.min(4, 1 + Math.floor((w / cap) * 3.999)));
+    let html = "", cur = -1, buf = "";
+    const flush = () => { if (buf) html += cur > 0 ? `<span class="h${cur}">${esc(buf)}</span>` : esc(buf); buf = ""; };
+    for (let i = 0; i < chars.length; i++) {
+      const l = /\s/.test(chars[i]) ? 0 : level(weights[i]);
+      if (l !== cur) { flush(); cur = l; }
+      buf += chars[i];
+    }
+    flush();
+    return html;
   }
 
   function update() {
     ["frontier", "openweight"].forEach((p) => $("#p-" + p).setAttribute("aria-pressed", String(p === st.panel)));
+    $("#panel-desc").textContent = PANEL[st.panel];
     const text = ta.value, chars = text.trim().length, words = (text.trim().match(/\S+/g) || []).length;
     const en = isEnglish(text);
-    $("#count").textContent = `${chars.toLocaleString()} chars, ${words.toLocaleString()} words${chars >= 20 ? (en ? ", english" : ", not english") : ""}`;
-    $("#flags").textContent = `--panel ${st.panel}`;
+    $("#count").textContent = `${chars.toLocaleString()} characters, ${words.toLocaleString()} words${chars >= 20 ? (en ? ", English" : ", not English") : ""}`;
     const out = $("#out"), ng = models[st.panel + "_ngram"], sm = models[st.panel + "_style"];
-    if (!ng) { out.innerHTML = line("loading classifiers (4 MB)...", "dim"); return; }
-    if (chars < 20) { out.innerHTML = line("waiting for text.", "dim"); return; }
+    if (!ng) { out.innerHTML = `<span class="dim">loading the classifiers (4 MB)…</span>`; return; }
+    if (chars < 20) { out.innerHTML = `<span class="dim">waiting for text. paste something above, or load a sample.</span>`; return; }
 
     const r = Attribution.charNgram(text, ng), ev = EVAL[st.panel + "_ngram"];
+    const n = ng.classes.length, top = ng.display[r.top];
     const lenB = bucket(ev.by_length_chars, chars), calB = bucket(ev.calibration, r.proba[r.top]);
     const s = st.sample != null ? SAMPLES[st.sample] : null;
-    const k = (label) => `<span class="dim">${pad(label, 13)}</span>`;
-    let h = line(`${k("verdict")}<span class="b">${esc(ng.display[r.top])}</span>  <span class="dim">p = ${r.proba[r.top].toFixed(2)}</span>`);
+    let h = "";
+    h += row("verdict", `<span class="b">${esc(top)}</span>`, "the model whose writing this text most resembles");
+    h += row("probability", `<span class="b">${r.proba[r.top].toFixed(2)}</span>`, `the classifier's confidence, out of 1.00 shared across ${n} models. guessing would give ${(1 / n).toFixed(2)} each`);
+    h += rowFull("ranking", `<div class="ranks">${ranks(r.proba, ng.display)}</div>`);
+    const calTxt = calB.lo === 0 ? `below ${calB.hi.toFixed(1)}` : calB.hi >= 1 ? `above ${calB.lo.toFixed(1)}` : `between ${calB.lo.toFixed(1)} and ${calB.hi.toFixed(1)}`;
+    h += row("reliability", `<span class="b">${pct(lenB.acc)}</span> at this length`, `on ${lenB.n} test texts of similar length, from prompts it never trained on, the top pick was right this often`);
+    h += row("", `<span class="b">${pct(calB.acc)}</span> at this probability`, `when its top probability was ${calTxt}, it was right this often`);
+    if (chars < 400) h += row("warning", `<span class="y">short text</span>`, "accuracy drops sharply below about 400 characters");
     if (s && s.panel === st.panel) {
       const ok = ng.classes[r.top] === s.author;
-      h += line(`${k("truth")}${esc(s.display)}  ${ok ? '<span class="g">correct</span>' : '<span class="r">wrong</span>'}  <span class="dim">(prompt ${esc(s.prompt)} was held out of training)</span>`);
+      h += row("true author", `${esc(s.display)} ${ok ? '<span class="g">✓ correct</span>' : '<span class="r">✗ wrong</span>'}`, `this sample's prompt (${esc(s.prompt)}) was kept out of training, so this is a fair test`);
     } else if (s) {
-      h += line(`${k("truth")}${esc(s.display)}  <span class="dim">(not in this panel)</span>`);
+      h += row("true author", esc(s.display), "this sample belongs to the other panel. switch above to test it");
     }
-    h += line(`${k("method")}character 1-4-grams, logistic regression, ${ng.vocab.length.toLocaleString()} features`);
-    h += gap + pre(ranked(r.proba, ng.display)) + gap;
-    const calTxt = calB.lo === 0 ? "under " + calB.hi.toFixed(1) : calB.hi >= 1 ? "over " + calB.lo.toFixed(1) : calB.lo.toFixed(1) + "-" + calB.hi.toFixed(1);
-    h += line(`${k("reliability")}${pct(lenB.acc, 0)} correct on held-out texts this long (n=${lenB.n}), ${pct(calB.acc, 0)} when top p was ${calTxt}. chance ${pct(ev.chance, 0)}.`);
-    if (chars < 400) h += line(`${k("warning")}<span class="y">short text. accuracy drops below about 400 chars.</span>`);
-    const grams = r.evidence(r.top, 14).map((g) => `<span class="y">"${esc(g.gram.replace(/\n/g, "\\n"))}"</span>`).join(" ");
-    h += line(`${k("evidence")}${grams || '<span class="dim">none</span>'}`);
+    const grams = r.evidence(r.top, 12).map((g) => `<span class="y">"${esc(g.gram.replace(/\n/g, "\\n"))}"</span>`).join("");
+    h += row("evidence", `<span class="grams">${grams || '<span class="dim">none</span>'}</span>`, `the character sequences in your text that push hardest toward ${esc(top)}, compared with the average model`);
+    h += rowFull("", `<details><summary>show where the evidence is in your text</summary><div class="print">${highlighted(text, ng, r.top)}</div>
+      <div class="dim" style="margin-top:6px"># brighter = that character's sequences point more strongly to ${esc(top)}. these shares add up exactly to the classifier's score.</div></details>`);
     if (en) {
       const sr = Attribution.style(text, sm), sev = EVAL[st.panel + "_style"];
       const push = sr.push(sr.top).sort((a, b) => b.w - a.w);
       const prof = sm.profile[sm.classes[sr.top]];
-      const rows = [`${pad("feature", 22)}${lpad("text", 9)}${lpad("model avg", 11)}${lpad("push", 8)}`,
-        ...push.map((p) => `${pad(p.feature, 22)}${lpad(fmt(p.value), 9)}${lpad(fmt(prof[p.feature][0]), 11)}${lpad((p.w > 0 ? "+" : "") + p.w.toFixed(2), 8)}`)];
-      h += line(`${k("style")}${esc(sm.display[sr.top])} <span class="dim">p = ${sr.proba[sr.top].toFixed(2)}, 18 english features, ${pct(sev.overall.acc, 0)} held-out</span>`);
-      h += `<details><summary>features</summary>${pre(esc(rows.join("\n")))}</details>`;
+      const rows = [`${pad("feature", 22)}${lpad("your text", 11)}${lpad(sm.display[sr.top].split(" ")[0] + " avg", 14)}${lpad("push", 8)}`,
+        ...push.map((p) => `${pad(p.feature.replace(/_/g, " "), 22)}${lpad(fmt(p.value), 11)}${lpad(fmt(prof[p.feature][0]), 14)}${lpad((p.w > 0 ? "+" : "") + p.w.toFixed(2), 8)}`)];
+      h += row("second opinion", `${esc(sm.display[sr.top])}, ${sr.proba[sr.top].toFixed(2)}`, `a separate classifier on 18 readable measurements (sentence length, commas, hedges…). only ${pct(sev.overall.acc)} accurate, so treat it as a hint`);
+      h += rowFull("", `<details><summary>show the 18 measurements</summary><div class="tbl">${esc(rows.join("\n"))}</div>
+        <div class="dim" style="margin-top:6px"># push: how much that measurement moved the vote toward ${esc(sm.display[sr.top])}. positive = toward.</div></details>`);
     } else {
-      h += line(`${k("style")}<span class="dim">skipped, english only</span>`);
+      h += row("second opinion", `<span class="dim">skipped</span>`, "the 18 style measurements are defined for English only");
     }
-    h += gap + line("note: always picks one of the listed models. human text and other models get matched to the closest one.", "dim");
     out.innerHTML = h;
   }
 
@@ -473,96 +567,113 @@ details > summary:hover { color: var(--fg); }
     }));
   }
 
+  // ------------------------------------------------------------ how it works
+  function renderSteps() {
+    const F = EVAL.frontier_ngram, O = EVAL.openweight_ngram;
+    const steps = [
+      ["collect", `<span class="b">2,589 texts with known authors.</span> Every model answered the same prompts (essays, explanations, code, math, short answers), so the content is held fixed and only the writing style differs.
+        <span class="dim">frontier: 1,629 texts from the chat apps and APIs, in English plus Spanish, Chinese, Russian, Japanese, Turkish and Hindi. open-weight: 960 texts generated locally, two per prompt.</span>`],
+      ["featurize", `<span class="b">Cut each text into every sequence of 1 to 4 characters</span>, spaces and punctuation included. "says, " gives "s", "sa", "say", "ays,", "s, " and so on. Each sequence is weighted by tf-idf: high if it is frequent in this text but rare across all texts. The 40,000 most common sequences are kept, so every text becomes a list of 40,000 numbers.`],
+      ["train", `<span class="b">Logistic regression</span> learns one weight per sequence per model. A positive weight means that model uses the sequence more than the others do: a favourite word ending, a habit with commas or dashes, a formatting tic.`],
+      ["predict", `<span class="b">Your text goes through the same steps.</span> Each model's score is the sum of (sequence value × that model's weight), and a softmax turns the scores into probabilities that add up to 1. The evidence and highlights show which sequences contributed most to the winning score.`],
+      ["test", `<span class="b">Five-fold cross-validation, grouped by prompt.</span> All texts written for one prompt (every model, every language) are always on the same side of the split, so each test text comes from a prompt the classifier never saw. Result: <span class="b">${pct(F.overall.acc, 1)}</span> on the frontier models (guessing: 20%) and <span class="b">${pct(O.overall.acc, 1)}</span> on the open-weight models (guessing: 25%). The reliability line in each reading comes from these tests.`],
+      ["second opinion", `<span class="b">A separate, readable classifier</span> measures 18 things a person can check, such as average sentence length, commas per 100 words, hedging words and readability grade, and runs the same kind of regression on them. It is weaker (${pct(EVAL.frontier_style.overall.acc)} frontier, ${pct(EVAL.openweight_style.overall.acc)} open-weight) but every number behind it is visible.`],
+    ];
+    $("#steps").innerHTML = steps.map(([k, t], i) => `<div class="step"><span class="n">${i + 1}.</span><div class="t"><h3>${esc(k)}</h3><p>${t}</p></div></div>`).join("") +
+      `<div class="step"><span class="n">!</span><div class="t"><h3>limits</h3><p>It always names one of the listed models, even for human writing or text from a model it has never seen. It was trained on 2026 snapshots, so newer model versions may write differently. Paraphrased or edited text was never tested, and translation cut accuracy to 57–70%. Under about 400 characters it is much less reliable.</p></div></div>`;
+  }
+
   // ------------------------------------------------------------ results
   function renderResults() {
     const L = RES.likelihood, PR = RES.probes, LG = RES.langllm, S1 = RES.study1, ST = RES.steering;
-    const best = (o) => Math.max(...Object.values(o));
-    const block = (title, rows) => line(`<span class="b">${esc(title)}</span>`) + pre(esc(rows.join("\n"))) + gap;
-    const rowfmt = (a, b, c, d) => `${pad(a, 34)}${pad(b, 28)}${lpad(c, 7)}${lpad(d, 8)}`;
-    let h = gap;
-    h += block("accuracy by method, held-out prompts", [
-      rowfmt("method", "needs", "acc", "chance"),
-      rowfmt("likelihood, with prompt", "log-probs, every model", pct(L.with_prompt.raw.acc), "25%"),
-      rowfmt("likelihood, text only, z-scored", "log-probs, every model", pct(L.text_only.zscore.acc), "25%"),
-      rowfmt("hidden-state probe, best reader", "one open model", pct(best(PR.full.acc4)), "25%"),
-      rowfmt("char n-grams", "text", pct(PR.text_baselines_acc4.char_1_5), "25%"),
-      rowfmt("style features, random forest", "text", pct(S1.style_rf_openweight.pooled), "25%"),
-      rowfmt("style features, study 1", "text", pct(S1.style_rf_frontier.acc), "20%"),
-      rowfmt("char n-grams, this tool", "text", pct(EVAL.frontier_ngram.overall.acc), "20%"),
-      rowfmt("llm judge, lineup", "ask the model", pct(S1.judges_frontier.lineup), "20%"),
-      rowfmt("llm judge, one text", "ask the model", pct(S1.judges_frontier.single), "20%"),
+    const best = (o) => Math.max(...Object.values(o)), worst = (o) => Math.min(...Object.values(o));
+    const block = (title, what, rows, src) => `<div class="box stack" style="gap:10px"><h3>${esc(title)}</h3><p class="dim"># ${what}</p><div class="tbl">${esc(rows.join("\n"))}</div>${src ? `<p class="dim" style="font-size:12.5px">source: ${esc(src)}</p>` : ""}</div>`;
+    const m = (a, b, c, d) => `${pad(a, 32)}${pad(b, 26)}${lpad(c, 8)}${lpad(d, 9)}`;
+    let h = "";
+    h += block("1. you can tell which model wrote a text, unless you ask a model",
+      "accuracy at naming the author on unseen prompts. the more access a method has to the models, the better it does.", [
+      m("method", "needs", "correct", "guessing"),
+      m("likelihood, with the prompt", "log-probs from every model", pct(L.with_prompt.raw.acc, 1), "25%"),
+      m("likelihood, text only", "log-probs from every model", pct(L.text_only.zscore.acc, 1), "25%"),
+      m("hidden-state probe", "one open model's internals", pct(best(PR.full.acc4), 1), "25%"),
+      m("character n-grams", "the text", pct(PR.text_baselines_acc4.char_1_5, 1), "25%"),
+      m("style features", "the text", pct(S1.style_rf_openweight.pooled, 1), "25%"),
       "",
-      "rows 1-5: 4 open-weight models. rows 6-9: 5 frontier models.",
-    ]);
-    h += block("likelihood confusion, text only, z-scored (rows = true author, n = 480)", [
-      pad("", 10) + L.labels.map((l) => lpad(l, 9)).join(""),
-      ...L.labels.map((l, i) => pad(l, 10) + L.text_only.zscore.confusion[i].map((v) => lpad(v, 9)).join("")),
-    ]);
-    h += block("hidden-state probes, 4-way accuracy by reader", [
-      `${pad("reader", 10)}${lpad("full", 8)}${lpad("32 words", 10)}${lpad("own auc", 10)}  strongest peer`,
+      m("style features (study 1)", "the text", pct(S1.style_rf_frontier.acc, 1), "20%"),
+      m("character n-grams (this page)", "the text", pct(EVAL.frontier_ngram.overall.acc, 1), "20%"),
+      m("ask the model: lineup of 5", "a judge model", pct(S1.judges_frontier.lineup, 1), "20%"),
+      m("ask the model: one text", "a judge model", pct(S1.judges_frontier.single, 1), "20%"),
+      "",
+      "top block: 4 open-weight models. bottom block: 5 frontier models.",
+    ], "CompLLM studies 1-2, WLLFM, this page");
+    h += block("2. likelihood names the author almost perfectly",
+      `score each text under all 4 open models; pick the one that finds it most likely (after standardising each model's scores). rows = true author, columns = verdict. ${pct(L.text_only.zscore.acc, 1)} from the text alone; ${pct(L.with_prompt.raw.acc)} when the prompt is known.`, [
+      pad("true \\ verdict", 16) + L.labels.map((l) => lpad(l, 9)).join(""),
+      ...L.labels.map((l, i) => pad(l, 16) + L.text_only.zscore.confusion[i].map((v) => lpad(v, 9)).join("")),
+    ], L.source);
+    h += block("3. any model's internals reveal the author, but not 'self'",
+      `a linear probe on each model's hidden state identifies which of 4 models wrote a text (${pct(worst(PR.full.acc4))}-${pct(best(PR.full.acc4))}, guessing 25%). a model's own states are no better at spotting its own texts than its strongest peer's are.`, [
+      `${pad("reader", 10)}${lpad("full text", 11)}${lpad("first 32 words", 16)}${lpad("own AUC", 10)}   strongest peer AUC`,
       ...PR.readers.map((r) => { const v = PR.full.self_vs_peer[r];
-        return `${pad(r, 10)}${lpad(pct(PR.full.acc4[r]), 8)}${lpad(pct(PR.first_32_words.acc4[r]), 10)}${lpad(v.self.toFixed(3), 10)}  ${v.strongest_peer} ${v.strongest_peer_auc.toFixed(3)}`; }),
-      "", "no model reads its own texts better than its strongest peer.",
-    ]);
-    h += block("langllm, 5-way accuracy by language, chance 20%", [
-      `${pad("language", 10)}${lpad("char", 7)}${lpad("word", 7)}${lpad("style", 7)}${lpad("best judge", 12)}`,
-      ...LG.by_language.map((r) => `${pad(r.name.toLowerCase(), 10)}${lpad(pct(r.char_ngram, 0), 7)}${lpad(pct(r.word_ngram, 0), 7)}${lpad(pct(r.features, 0), 7)}${lpad(pct(r.judge_best, 0), 12)}`),
-    ]);
-    h += block("steering at a late layer, change in log-odds of yes per unit", [
-      `${pad("judge", 9)}${lpad("own-author", 11)}${lpad("yes ctrl", 10)}  random 95%`,
-      ...Object.entries(ST.judges).map(([j, v]) => `${pad(j, 9)}${lpad((v.author > 0 ? "+" : "") + v.author.toFixed(2), 11)}${lpad("+" + v.yes_control.toFixed(2), 10)}  [${v.null_lo.toFixed(2)}, ${v.null_hi.toFixed(2)}]`),
-      "", "the yes direction moves every judge. the own-author direction never makes it say yes.",
-    ]);
-    h += block("this tool's classifiers, 5-fold cv with prompts grouped", [
-      `${pad("classifier", 20)}${lpad("acc", 8)}${lpad("n", 7)}${lpad("chance", 8)}`,
-      ...["frontier_ngram", "frontier_style", "openweight_ngram", "openweight_style"].map((k) =>
-        `${pad(k, 20)}${lpad(pct(EVAL[k].overall.acc), 8)}${lpad(EVAL[k].overall.n, 7)}${lpad(pct(EVAL[k].chance, 0), 8)}`),
-    ]);
-    h += line("sources: self-recognition-peer-baseline/results, LangLLM/results, legacy/compllm/results/wllfm, site/models/eval.json", "dim");
+        return `${pad(r, 10)}${lpad(pct(PR.full.acc4[r], 1), 11)}${lpad(pct(PR.first_32_words.acc4[r], 1), 16)}${lpad(v.self.toFixed(3), 10)}   ${v.strongest_peer} ${v.strongest_peer_auc.toFixed(3)}`; }),
+    ], PR.source);
+    h += block("4. it works in seven languages",
+      "5 frontier models writing essays natively in each language. accuracy with each method; guessing is 20%. the best judge model never gets past 36%.", [
+      `${pad("language", 11)}${lpad("char n-grams", 13)}${lpad("word n-grams", 14)}${lpad("style", 8)}${lpad("best judge", 12)}`,
+      ...LG.by_language.map((r) => `${pad(r.name, 11)}${lpad(pct(r.char_ngram), 13)}${lpad(pct(r.word_ngram), 14)}${lpad(pct(r.features), 8)}${lpad(pct(r.judge_best), 12)}`),
+    ], LG.source);
+    h += block("5. pushing a judge toward its own style never makes it say 'I wrote this'",
+      "steering: add a direction to the judge's internal state and measure how its answer to 'did you write this?' moves (change in log-odds of yes). a known 'yes' direction moves every judge, so the method works; the judge's own-author direction stays inside the range of random directions, or pushes toward no.", [
+      `${pad("judge", 9)}${lpad("own-author dir", 16)}${lpad("'yes' dir", 11)}   random directions, 95% range`,
+      ...Object.entries(ST.judges).map(([j, v]) => `${pad(j, 9)}${lpad((v.author > 0 ? "+" : "") + v.author.toFixed(2), 16)}${lpad("+" + v.yes_control.toFixed(2), 11)}   ${v.null_lo.toFixed(2)} to ${v.null_hi.toFixed(2)}`),
+    ], ST.source);
     $("#res").innerHTML = h;
   }
 
   function renderMethods() {
-    const L = RES.likelihood, PR = RES.probes;
+    const L = RES.likelihood, PR = RES.probes, S1 = RES.study1;
     const best = (o) => Math.max(...Object.values(o)), worst = (o) => Math.min(...Object.values(o));
-    $("#meth").innerHTML = gap +
-      line(`<span class="b">this tool</span>    char n-grams and style features, trained on 2,589 texts, run in your browser.`) +
-      line(`             pasted text is never sent anywhere.`, "dim") + gap +
-      line(`<span class="b">likelihood</span>   ${pct(L.with_prompt.raw.acc, 0)} with prompt, ${pct(L.text_only.zscore.acc)} text only. needs log-probs from every candidate. gpu.`) +
-      pre(`<span class="dim">$</span> python examples/likelihood_attribution.py path/to/self-recognition-peer-baseline
-<span class="dim">$</span> python legacy/compllm/src/revision/score_likelihood.py`) + gap +
-      line(`<span class="b">probe</span>        ${pct(worst(PR.full.acc4))}-${pct(best(PR.full.acc4))}. needs one open model's activations and labelled texts. gpu.`) +
-      pre(`<span class="dim">$</span> python src/wllfm/extract_states.py
-<span class="dim">$</span> python src/wllfm/probe.py --boot 2000`) + gap +
-      line(`<span class="b">llm judge</span>    near chance. not included.`) + gap +
-      line(`limits: closed set of 9 models. 2026 snapshots. unedited text only. short texts are unreliable.`, "dim");
+    const items = [
+      ["likelihood", `<span class="b">${pct(L.text_only.zscore.acc, 1)}</span> from the text alone, <span class="b">${pct(L.with_prompt.raw.acc)}</span> with the prompt. <span class="dim">needs: log-probabilities from every candidate model.</span>`,
+        "Run the text through each candidate model and ask how probable it finds every token. A model finds its own writing unusually likely. Standardise each model's average log-probability across texts and pick the highest. No training data needed, but it only works for models you can run or score.",
+        "python examples/likelihood_attribution.py path/to/self-recognition-peer-baseline\npython legacy/compllm/src/revision/score_likelihood.py   # scores new texts, needs a GPU"],
+      ["hidden-state probe", `<span class="b">${pct(worst(PR.full.acc4), 1)}–${pct(best(PR.full.acc4), 1)}</span>. <span class="dim">needs: one open model and labelled texts.</span>`,
+        "Feed the text to any open model and read its internal activations at the last token. A linear classifier trained on those activations predicts the author. The reader does not have to be the author: every model reads every author about equally well.",
+        "python src/wllfm/extract_states.py          # activations, needs a GPU\npython src/wllfm/probe.py --boot 2000       # the probes"],
+      ["style features (random forest)", `<span class="b">${pct(S1.style_rf_frontier.acc, 1)}</span> on 5 frontier models. <span class="dim">needs: the text.</span>`,
+        "The same 18 readable measurements as the second opinion on this page, with a random forest instead of logistic regression. Strong on essays, weak on code and math. Much of its signal is text length.", ""],
+      ["ask the model", `<span class="b">${pct(S1.judges_frontier.single, 1)}–${pct(S1.judges_frontier.lineup, 1)}</span>, guessing 20%. <span class="dim">needs: a judge model.</span>`,
+        "Show a model the text (or a lineup of five) and ask who wrote it, or ask 'did you write this?'. Barely above guessing, and judges tend to repeat one favourite answer. Not included on this page.", ""],
+    ];
+    $("#meth").innerHTML = items.map(([name, res, how, cmd]) => `<div class="method"><h3>${esc(name)}</h3><div class="t"><p>${res}</p><p>${how}</p>${cmd ? `<div class="box pre" style="margin-top:6px"><span class="dim">$</span> ${esc(cmd).replace(/\n/g, '\n<span class="dim">$</span> ')}</div>` : ""}</div></div>`).join("");
   }
 
   function renderCode() {
     const rows = [
+      ["this page, in the browser", "site/attribution.js", "charNgram, fingerprint, style"],
+      ["this page, training", "site/build/train_models.py", "train_ngram, train_style"],
       ["likelihood", "legacy/compllm/src/revision/backends.py#L300-L352", "HFBackend.score"],
       ["likelihood, one text", "examples/likelihood_attribution.py", "attribute"],
       ["hidden states", "legacy/compllm/src/wllfm/extract_states.py#L104-L146", "main"],
       ["probe", "legacy/compllm/src/wllfm/probe.py#L80-L93", "oof_scores"],
-      ["char n-grams", "legacy/compllm/src/wllfm/robustness.py#L112-L131", "text_baselines"],
-      ["style, english", "legacy/compllm/src/features.py#L157-L193", "extract"],
+      ["character n-grams", "legacy/compllm/src/wllfm/robustness.py#L112-L131", "text_baselines"],
+      ["style, English", "legacy/compllm/src/features.py#L157-L193", "extract"],
       ["style, any language", "legacy/langllm/langllm/features.py#L154-L219", "extract"],
       ["judge prompts", "legacy/compllm/src/revision/conditions.py#L46-L116", "lineup_prompt"],
       ["steering", "legacy/compllm/src/wllfm/steer2.py#L60-L87", "directions"],
-      ["this tool, training", "site/build/train_models.py", "train_ngram"],
-      ["this tool, browser", "site/attribution.js", "charNgram"],
-      ["everything", "ALGORITHMS.md", ""],
+      ["every method, with line links", "ALGORITHMS.md", ""],
     ];
-    $("#files").innerHTML = gap + rows.map(([m, f, fn]) =>
-      `<div class="pre">${esc(pad(m, 22))}<a href="${REPO + f}" target="_blank" rel="noopener">${esc(f.replace(/#.*/, ""))}</a>${fn ? `  <span class="dim">${esc(fn)}</span>` : ""}</div>`).join("");
+    $("#files").innerHTML = rows.map(([m, f, fn]) =>
+      `${esc(pad(m, 31))}<a href="${REPO + f}" target="_blank" rel="noopener">${esc(f.replace(/#.*/, ""))}</a>${fn ? `  <span class="dim">${esc(fn)}</span>` : ""}`).join("\n");
   }
 
+  renderSteps();
   renderResults();
   renderMethods();
   renderCode();
   loadSample(0);
   loadModels().then(update).catch((e) => {
-    $("#out").innerHTML = line(`<span class="r">error</span> ${esc(e.message)}. serve this folder over http (python -m http.server in site/).`);
+    $("#out").innerHTML = `<span class="r">error:</span> ${esc(e.message)}. serve this folder over http (python -m http.server inside site/).`;
   });
 })();
 </script>
