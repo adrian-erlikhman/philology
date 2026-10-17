@@ -6,16 +6,16 @@
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
 <body>
-<title>Philology</title>
+<title>LLM Authorship Attribution</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<meta name="description" content="Which language model wrote this text? Paste a text and Philology names the most likely author out of nine models, shows how reliable that is, and highlights what gave it away.">
+<meta name="description" content="Classifier and results from the CompLLM, LangLLM and WLLFM studies on attributing text to the language model that wrote it.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
 <style>
-/* Black, white and grey, like a developer tool's site. Sans for reading, mono
-   only inside terminal windows and for data. One extra colour: amber, which
-   marks the parts of a text that gave the author away. */
+/* Plain research page. Black, white and grey; sans for text, mono for code,
+   data and the command blocks. Amber marks evidence in a text, green and red
+   mark right and wrong. Tabs, no hero. */
 :root {
   color-scheme: dark;
   --bg: #000000;
@@ -33,60 +33,57 @@
   --mono: "Geist Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 }
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; scroll-padding-top: 72px; }
-@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }
 html, body { overflow-x: clip; }
 body {
   margin: 0; background: var(--bg); color: var(--text); font: 15px/1.6 var(--sans); -webkit-font-smoothing: antialiased;
-  padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); padding-block: 0 72px;
+  padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); padding-block: 0 64px;
 }
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
 .wrap { max-width: 1120px; margin: 0 auto; }
 a { color: var(--text); }
 :focus-visible { outline: 2px solid var(--text); outline-offset: 2px; border-radius: 4px; }
 h1, h2, h3 { margin: 0; font-weight: 600; text-wrap: balance; }
-p { margin: 0; }
+p { margin: 0; max-width: 72ch; }
 .muted { color: var(--text-2); }
 .faint { color: var(--text-3); }
 .mono { font-family: var(--mono); }
 .num { font-variant-numeric: tabular-nums; }
+.stack { display: grid; gap: 16px; }
 
-/* nav */
-.nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: rgba(0,0,0,.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--line); margin-inline: calc(-1 * max(20px, env(safe-area-inset-left, 0px))); padding-inline: max(20px, env(safe-area-inset-left, 0px)); }
-.nav .wrap { display: flex; align-items: center; gap: 28px; height: 60px; }
-.logo { display: inline-flex; align-items: center; gap: 9px; font-weight: 600; text-decoration: none; letter-spacing: -0.01em; }
-.logo i { width: 18px; height: 18px; border-radius: 4px; background: var(--text); display: grid; place-items: center; color: var(--bg); font: 600 12px/1 var(--mono); font-style: normal; }
-.nav nav { display: flex; gap: 22px; font-size: 14px; }
-.nav nav a { color: var(--text-2); text-decoration: none; }
-.nav nav a:hover { color: var(--text); }
-@media (max-width: 640px) { .nav nav { display: none; } }
+/* header + tabs */
+header.top { padding-block: 32px 0; display: grid; gap: 6px; }
+header.top h1 { font-size: 20px; letter-spacing: -0.02em; }
+header.top p { color: var(--text-2); font-size: 14px; }
+.tabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); display: flex; gap: 4px; overflow-x: auto;
+  border-bottom: 1px solid var(--line); margin-top: 20px; margin-bottom: 28px; }
+.tabs button { flex: none; font: 500 14px/1 var(--sans); color: var(--text-2); background: none; border: 0; padding: 14px 12px 13px;
+  border-bottom: 2px solid transparent; cursor: pointer; }
+.tabs button:first-child { padding-left: 0; }
+.tabs button:hover { color: var(--text); }
+.tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--text); }
 
-/* hero */
-.hero { padding-block: 72px 40px; display: grid; gap: 14px; }
-.hero h1 { font-size: clamp(34px, 5.6vw, 56px); line-height: 1.04; letter-spacing: -0.04em; }
-.hero p { font-size: 18px; color: var(--text-2); max-width: 40em; }
-
-/* buttons and controls */
-.btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--line-2);
+/* controls */
+.btn { display: inline-flex; align-items: center; height: 34px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--line-2);
   background: var(--card); color: var(--text); font: 500 13.5px/1 var(--sans); cursor: pointer; white-space: nowrap; }
 .btn:hover { background: var(--card-2); border-color: #3a3a3a; }
 .seg { display: inline-flex; padding: 3px; gap: 2px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--card); max-width: 100%; }
 .seg button { height: 28px; padding: 0 12px; border-radius: 5px; border: 0; background: none; color: var(--text-2); font: 500 13.5px/1 var(--sans); cursor: pointer; white-space: nowrap; }
 .seg button:hover { color: var(--text); }
 .seg button[aria-pressed="true"] { background: #222; color: var(--text); }
-select.btn { appearance: none; padding-right: 28px; background-image: linear-gradient(45deg, transparent 50%, var(--text-2) 50%), linear-gradient(135deg, var(--text-2) 50%, transparent 50%);
-  background-position: calc(100% - 15px) 14px, calc(100% - 10px) 14px; background-size: 5px 5px; background-repeat: no-repeat; max-width: 100%; }
+select.btn { appearance: none; padding-right: 28px; max-width: 100%;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-2) 50%), linear-gradient(135deg, var(--text-2) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 14px, calc(100% - 10px) 14px; background-size: 5px 5px; background-repeat: no-repeat; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
-/* tool */
+/* classifier tab */
 .tool { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 @media (max-width: 920px) { .tool { grid-template-columns: minmax(0, 1fr); } }
-.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
-.card-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--line); }
-.card-body { padding: 16px; display: grid; gap: 14px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+.card-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.card-head h3 { font-size: 14px; }
+.card-body { padding: 14px; display: grid; gap: 14px; }
 .help { font-size: 13px; color: var(--text-3); }
-.inputbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.textwrap { position: relative; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 textarea, .print {
   display: block; width: 100%; height: 380px; margin: 0; padding: 14px 16px; resize: vertical; overflow: auto;
   font: 13.5px/1.7 var(--mono); color: var(--text); background: #050505; border: 1px solid var(--line); border-radius: 8px;
@@ -100,13 +97,11 @@ textarea.drag { border-color: var(--amber); }
 .print .h3 { color: var(--amber); background: rgba(245,185,66,.20); }
 .print .h4 { color: #000; background: var(--amber); }
 .meta { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--text-3); }
-
-/* result */
-.result { display: grid; gap: 18px; }
+.result { display: grid; gap: 16px; }
 .who-label { font-size: 13px; color: var(--text-2); }
 .who { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.who h2 { font-size: 30px; letter-spacing: -0.03em; line-height: 1.1; }
-.who .p { font: 500 15px/1 var(--mono); color: var(--text-2); }
+.who h2 { font-size: 26px; letter-spacing: -0.025em; line-height: 1.15; }
+.who .p { font: 500 14px/1 var(--mono); color: var(--text-2); }
 .truth { font-size: 13.5px; border-radius: 8px; padding: 10px 12px; border: 1px solid var(--line-2); color: var(--text-2); }
 .truth b { color: var(--text); font-weight: 500; }
 .truth.ok b.st { color: var(--green); }
@@ -122,11 +117,11 @@ textarea.drag { border-color: var(--amber); }
 .stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .stat { border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: grid; gap: 2px; }
 .stat .k { font-size: 12.5px; color: var(--text-2); }
-.stat .v { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+.stat .v { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
 .stat .s { font-size: 12.5px; color: var(--text-3); line-height: 1.45; }
 .warn { font-size: 13px; color: var(--amber); }
 .block { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 14px; }
-.block-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.block-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
 .block-head h3 { font-size: 14px; font-weight: 500; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { font: 12.5px/1 var(--mono); padding: 5px 7px; border-radius: 5px; background: rgba(245,185,66,.12); color: var(--amber); border: 1px solid rgba(245,185,66,.25); white-space: pre; }
@@ -136,192 +131,123 @@ details summary::after { content: " ↓"; }
 details[open] summary::after { content: " ↑"; }
 details summary:hover { color: var(--text); }
 details[open] summary { margin-bottom: 8px; }
-table { border-collapse: collapse; width: 100%; font-size: 13px; }
-th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
-th { color: var(--text-3); font-weight: 500; font-size: 12px; }
-td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 12.5px; }
-.tbl { overflow-x: auto; }
+.notes { margin-top: 20px; display: grid; gap: 4px; font-size: 13.5px; color: var(--text-2); }
+.notes ul { margin: 0; padding-left: 18px; display: grid; gap: 3px; }
 
-/* terminal window */
-.term { background: #050505; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; min-width: 0; }
-.term-bar { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; border-bottom: 1px solid var(--line); background: var(--card); }
-.term-bar i { width: 10px; height: 10px; border-radius: 50%; background: #2a2a2a; display: block; }
-.term-bar span { margin-left: 6px; font: 12px/1 var(--mono); color: var(--text-3); }
-.term pre { margin: 0; padding: 16px 18px; font: 13px/1.75 var(--mono); color: var(--text-2); overflow-x: auto; }
+/* tables and blocks */
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--text-3); font-weight: 500; font-size: 12.5px; }
+td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
+td.r { font-family: var(--mono); font-size: 13px; }
+tr.sep td { border-bottom: 0; padding-top: 18px; color: var(--text-3); font-size: 12.5px; }
+.tbl { overflow-x: auto; }
+.res { display: grid; gap: 14px; padding: 20px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); min-width: 0; }
+.res h2 { font-size: 16px; letter-spacing: -0.01em; }
+.res > p { color: var(--text-2); font-size: 14px; }
+.src { font: 12px/1.5 var(--mono); color: var(--text-3); overflow-wrap: anywhere; }
+.term { background: #050505; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; min-width: 0; }
+.term pre { margin: 0; padding: 14px 16px; font: 13px/1.75 var(--mono); color: var(--text-2); overflow-x: auto; }
 .term .p { color: var(--text-3); user-select: none; }
 .term .w { color: var(--text); }
 .term .a { color: var(--amber); }
 .term .c { color: var(--text-3); }
-
-/* sections */
-section.sec { padding-top: 104px; }
-.sec-head { display: grid; gap: 10px; margin-bottom: 28px; max-width: 46em; }
-.sec-head h2 { font-size: clamp(26px, 3.4vw, 34px); letter-spacing: -0.035em; line-height: 1.1; }
-.sec-head p { color: var(--text-2); font-size: 16px; }
-.grid { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-.grid > * { background: var(--bg); padding: 20px; min-width: 0; }
-.steps { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-@media (max-width: 980px) { .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 560px) { .steps { grid-template-columns: minmax(0, 1fr); } }
-.step { display: grid; gap: 8px; align-content: start; }
-.step .k { font: 12px/1 var(--mono); color: var(--text-3); }
-.step h3 { font-size: 15px; }
-.step p { font-size: 14px; color: var(--text-2); }
-.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-@media (max-width: 860px) { .two { grid-template-columns: minmax(0, 1fr); } }
-.finds { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-@media (max-width: 860px) { .finds { grid-template-columns: minmax(0, 1fr); } }
-.find { display: grid; gap: 10px; align-content: start; }
-.find .big { font-size: 34px; font-weight: 600; letter-spacing: -0.04em; line-height: 1; }
-.find h3 { font-size: 16px; }
-.find p { font-size: 14px; color: var(--text-2); }
-.src { font: 11.5px/1.5 var(--mono); color: var(--text-3); overflow-wrap: anywhere; }
-.methods { grid-template-columns: minmax(0, 1fr); }
-.mrow { display: grid; grid-template-columns: 200px minmax(0, 1fr) 170px; gap: 6px 24px; align-items: baseline; }
-@media (max-width: 760px) { .mrow { grid-template-columns: minmax(0, 1fr); } }
-.mrow h3 { font-size: 15px; }
-.mrow p { font-size: 14px; color: var(--text-2); }
-.mrow .acc { font: 500 14px/1.4 var(--mono); text-align: right; white-space: nowrap; }
-@media (max-width: 760px) { .mrow .acc { text-align: left; } }
-.limits { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-@media (max-width: 860px) { .limits { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 520px) { .limits { grid-template-columns: minmax(0, 1fr); } }
-.limits h3 { font-size: 14px; margin-bottom: 4px; }
-.limits p { font-size: 13.5px; color: var(--text-2); }
-.files { grid-template-columns: minmax(0, 1fr); }
-.file { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 4px 20px; font-size: 14px; text-decoration: none; padding-block: 12px !important; }
-.file:hover { background: var(--card) !important; }
-.file .f { font: 13px/1.5 var(--mono); color: var(--text-2); overflow-wrap: anywhere; }
-@media (max-width: 640px) { .file { grid-template-columns: minmax(0, 1fr); } }
-footer { margin-top: 96px; padding-top: 24px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; font-size: 13.5px; color: var(--text-3); }
+.method { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 10px 28px; padding-block: 22px; border-bottom: 1px solid var(--line); }
+.method:first-child { padding-top: 0; }
+@media (max-width: 760px) { .method { grid-template-columns: minmax(0, 1fr); } }
+.method h2 { font-size: 16px; }
+.method .meta2 { font: 13px/1.5 var(--mono); color: var(--text-3); margin-top: 6px; }
+.method .body { display: grid; gap: 10px; min-width: 0; }
+.method .body p { color: var(--text-2); font-size: 14.5px; }
+ol.steps { margin: 0; padding-left: 20px; display: grid; gap: 6px; color: var(--text-2); font-size: 14.5px; }
+ol.steps b { color: var(--text); font-weight: 500; }
+.files a { display: grid; grid-template-columns: 240px minmax(0, 1fr) minmax(0, 0.8fr); gap: 4px 20px; padding: 11px 0; border-bottom: 1px solid var(--line);
+  text-decoration: none; font-size: 14px; }
+.files a:hover .f { color: var(--text); }
+.files .f { font: 13px/1.5 var(--mono); color: var(--text-2); overflow-wrap: anywhere; }
+.files .fn { font: 13px/1.5 var(--mono); color: var(--text-3); }
+@media (max-width: 700px) { .files a { grid-template-columns: minmax(0, 1fr); } }
+footer { margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 13px; color: var(--text-3); }
 </style>
 
-<header class="nav">
-  <div class="wrap">
-    <a class="logo" href="#top"><i>p</i>philology</a>
-    <nav aria-label="Sections"><a href="#try">Try it</a><a href="#how">How it works</a><a href="#findings">Findings</a><a href="#methods">Methods</a><a href="#code">Code</a></nav>
-  </div>
-</header>
+<div class="wrap">
+  <header class="top">
+    <h1>LLM authorship attribution</h1>
+    <p>Classifier and results from the CompLLM, LangLLM and WLLFM studies. Adrian Erlikhman, Michael Tarekegn, Philo Juang. October 2026.</p>
+  </header>
 
-<main class="wrap" id="top">
-  <div class="hero">
-    <h1>Which model wrote this?</h1>
-    <p>Paste any text. Philology compares it with 2,589 texts from nine language models, names the closest match, tells you how often that call is right, and highlights what gave it away. It runs in your browser, so your text never leaves the page.</p>
+  <div class="tabs" role="tablist" aria-label="Sections">
+    <button role="tab" id="tab-classifier" aria-controls="classifier" aria-selected="true">Classifier</button>
+    <button role="tab" id="tab-results" aria-controls="results" aria-selected="false">Results</button>
+    <button role="tab" id="tab-methods" aria-controls="methods" aria-selected="false">Methods</button>
+    <button role="tab" id="tab-code" aria-controls="code" aria-selected="false">Code</button>
   </div>
 
-  <!-- ====================================================== tool -->
-  <div class="tool" id="try">
-    <div class="card">
-      <div class="card-head">
-        <div class="seg" role="group" aria-label="Which models to compare">
-          <button type="button" id="p-frontier" aria-pressed="true">Frontier models</button>
-          <button type="button" id="p-openweight" aria-pressed="false">Open-weight models</button>
+  <!-- ======================================================= classifier -->
+  <section id="classifier" role="tabpanel" aria-labelledby="tab-classifier">
+    <div class="tool">
+      <div class="card">
+        <div class="card-head">
+          <div class="seg" role="group" aria-label="Candidate models">
+            <button type="button" id="p-frontier" aria-pressed="true">Frontier models</button>
+            <button type="button" id="p-openweight" aria-pressed="false">Open-weight models</button>
+          </div>
+          <div class="seg" role="group" aria-label="View">
+            <button type="button" id="v-edit" aria-pressed="true">Text</button>
+            <button type="button" id="v-print" aria-pressed="false">Highlights</button>
+          </div>
         </div>
-        <div class="seg" role="group" aria-label="View">
-          <button type="button" id="v-edit" aria-pressed="true">Text</button>
-          <button type="button" id="v-print" aria-pressed="false">Highlights</button>
+        <div class="card-body">
+          <p class="help" id="panel-desc"></p>
+          <div class="row">
+            <label for="sample" class="sr">Load a sample</label>
+            <select class="btn" id="sample"></select>
+            <label class="btn" for="file">Upload .txt</label>
+            <input id="file" type="file" accept=".txt,.md,text/plain" hidden>
+            <button class="btn" type="button" id="clear">Clear</button>
+          </div>
+          <div>
+            <label for="text" class="sr">Text to attribute</label>
+            <textarea id="text" spellcheck="false" placeholder="Paste a text here, or drop a .txt file."></textarea>
+            <div class="print" id="print" hidden tabindex="0" aria-label="Highlighted text. Click to edit."></div>
+          </div>
+          <div class="meta"><span id="count"></span><span id="viewhint"></span></div>
         </div>
       </div>
-      <div class="card-body">
-        <p class="help" id="panel-desc"></p>
-        <div class="inputbar">
-          <label for="sample" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Try a sample</label>
-          <select class="btn" id="sample"></select>
-          <label class="btn" for="file">Upload .txt</label>
-          <input id="file" type="file" accept=".txt,.md,text/plain" hidden>
-          <button class="btn" type="button" id="clear">Clear</button>
-        </div>
-        <div class="textwrap">
-          <label for="text" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Text to attribute</label>
-          <textarea id="text" spellcheck="false" placeholder="Paste a text here, or drop a .txt file."></textarea>
-          <div class="print" id="print" hidden tabindex="0" aria-label="Highlighted text. Click to edit."></div>
-        </div>
-        <div class="meta"><span id="count"></span><span id="viewhint"></span></div>
+      <div class="card" aria-live="polite">
+        <div class="card-head"><h3>Result</h3><span class="help">character n-gram classifier</span></div>
+        <div class="card-body result" id="out"></div>
       </div>
     </div>
-
-    <div class="card" aria-live="polite">
-      <div class="card-head"><h3 style="font-size:14px">Result</h3><span class="help mono" id="cmd"></span></div>
-      <div class="card-body result" id="out"></div>
-    </div>
-  </div>
-
-  <!-- ====================================================== how -->
-  <section class="sec" id="how">
-    <div class="sec-head">
-      <h2>How it works</h2>
-      <p>Every model has habits: favourite word endings, how it uses commas and dashes, how it opens a sentence. Philology learns those habits from texts with known authors and looks for them in yours.</p>
-    </div>
-    <div class="term" style="margin-bottom:16px">
-      <div class="term-bar"><i></i><i></i><i></i><span>pipeline</span></div>
-<pre><span class="w">your text</span>                                     <span class="c">"…the model says, …"</span>
-  <span class="p">→</span> cut into every 1–4 character sequence     <span class="a">"s"  "sa"  "say"  "ays,"  "s, "</span>  …
-  <span class="p">→</span> weight each one by tf-idf                 <span class="c">40,000 numbers</span>
-  <span class="p">→</span> multiply by each model's weights          <span class="c">one score per model</span>
-  <span class="p">→</span> softmax                                   <span class="c">probabilities that add up to 1</span>
-<span class="w">verdict</span>                                       <span class="c">the model with the highest probability</span></pre>
-    </div>
-    <div class="grid steps" id="steps"></div>
-  </section>
-
-  <!-- ====================================================== findings -->
-  <section class="sec" id="findings">
-    <div class="sec-head">
-      <h2>What the research found</h2>
-      <p>Three studies asked whether you can tell which model wrote a text. You can, very reliably, as long as you don't ask a model. Every number is measured on prompts the method never saw.</p>
-    </div>
-    <div class="grid finds" id="finds"></div>
-  </section>
-
-  <!-- ====================================================== methods -->
-  <section class="sec" id="methods">
-    <div class="sec-head">
-      <h2>Every method we tested</h2>
-      <p>This page runs the two text-only classifiers. The two strongest methods need the models themselves and a GPU, so they run from the repository.</p>
-    </div>
-    <div class="grid methods" id="meth"></div>
-    <div class="two" style="margin-top:16px">
-      <div class="term"><div class="term-bar"><i></i><i></i><i></i><span>likelihood</span></div>
-<pre><span class="c"># reproduce from saved scores</span>
-<span class="p">$</span> python examples/likelihood_attribution.py \
-    path/to/self-recognition-peer-baseline
-
-<span class="c"># score new texts (GPU)</span>
-<span class="p">$</span> python src/revision/score_likelihood.py</pre></div>
-      <div class="term"><div class="term-bar"><i></i><i></i><i></i><span>probe</span></div>
-<pre><span class="c"># activations of each model (GPU)</span>
-<span class="p">$</span> python src/wllfm/extract_states.py
-
-<span class="c"># train and test the probes</span>
-<span class="p">$</span> python src/wllfm/probe.py --boot 2000</pre></div>
+    <div class="notes">
+      <span>Notes</span>
+      <ul>
+        <li>Runs in the browser; the text is not sent anywhere.</li>
+        <li>The classifier always picks one of the listed models, including for human writing or other models.</li>
+        <li>Trained on outputs collected June–October 2026. Newer model versions may differ.</li>
+        <li>Edited or paraphrased text was not tested. Accuracy falls sharply below about 400 characters.</li>
+      </ul>
     </div>
   </section>
 
-  <!-- ====================================================== limits -->
-  <section class="sec" id="limits">
-    <div class="sec-head"><h2>Limits</h2></div>
-    <div class="grid limits">
-      <div><h3>It always picks one</h3><p>Human writing, or text from a model not listed, still gets matched to the closest of the nine.</p></div>
-      <div><h3>2026 snapshots</h3><p>Trained on outputs from June to October 2026. Newer model versions may write differently.</p></div>
-      <div><h3>Unedited text</h3><p>Paraphrased or edited text was never tested. Translation cut accuracy to 57–70%.</p></div>
-      <div><h3>Length matters</h3><p>Below about 400 characters it is much less reliable. Each result shows the accuracy for its length.</p></div>
-    </div>
+  <!-- ======================================================= results -->
+  <section id="results" role="tabpanel" aria-labelledby="tab-results" hidden>
+    <div class="stack" id="res"></div>
   </section>
 
-  <!-- ====================================================== code -->
-  <section class="sec" id="code">
-    <div class="sec-head">
-      <h2>Code</h2>
-      <p>Where each method is implemented, in the private <span class="mono">llm-attribution</span> repository. Links open for collaborators.</p>
-    </div>
-    <div class="grid files" id="files"></div>
+  <!-- ======================================================= methods -->
+  <section id="methods" role="tabpanel" aria-labelledby="tab-methods" hidden>
+    <div id="meth"></div>
   </section>
 
-  <footer>
-    <span>philology v0.1 · October 2026 · built from CompLLM, LangLLM and WLLFM</span>
-    <span>Adrian Erlikhman, Michael Tarekegn, Philo Juang</span>
-  </footer>
-</main>
+  <!-- ======================================================= code -->
+  <section id="code" role="tabpanel" aria-labelledby="tab-code" hidden>
+    <p class="muted" style="margin-bottom:16px">Files in the <span class="mono">llm-attribution</span> repository (private; collaborators only). <span class="mono">ALGORITHMS.md</span> has line-level links for every method.</p>
+    <div class="files" id="files"></div>
+  </section>
+
+  <footer>Accuracies are on prompts held out of training. Sources are listed under each result.</footer>
+</div>
 
 <script id="results-data" type="application/json">{"likelihood":{"source":"self-recognition-peer-baseline/results/revision/openweight/likelihood.csv","labels":["Qwen","Llama","Mistral","Phi"],"with_prompt":{"n":480,"raw":{"acc":1.0,"confusion":[[120,0,0,0],[0,120,0,0],[0,0,120,0],[0,0,0,120]]},"zscore":{"acc":0.998,"confusion":[[120,0,0,0],[0,119,0,1],[0,0,120,0],[0,0,0,120]]}},"text_only":{"n":480,"raw":{"acc":0.84,"confusion":[[118,0,2,0],[4,107,9,0],[0,0,120,0],[22,0,40,58]]},"zscore":{"acc":0.95,"confusion":[[114,0,2,4],[2,117,0,1],[0,0,120,0],[5,0,10,105]]}}},"probes":{"source":"legacy/compllm/results/wllfm/probe_summary.json (+ _w32)","readers":["Qwen","Llama","Mistral","Phi"],"full":{"acc4":{"Qwen":0.87,"Llama":0.848,"Mistral":0.841,"Phi":0.865},"self_vs_peer":{"Qwen":{"self":0.975,"strongest_peer":"Phi","strongest_peer_auc":0.975,"p_holm":1.0},"Llama":{"self":0.961,"strongest_peer":"Qwen","strongest_peer_auc":0.983,"p_holm":1.0},"Mistral":{"self":0.97,"strongest_peer":"Phi","strongest_peer_auc":0.974,"p_holm":1.0},"Phi":{"self":0.935,"strongest_peer":"Llama","strongest_peer_auc":0.923,"p_holm":0.448}},"auc_matrix":{"Qwen":{"Qwen":0.9747858796296297,"Llama":0.9827951388888889,"Mistral":0.9681655092592591,"Phi":0.9182581018518519},"Llama":{"Qwen":0.9630844907407408,"Llama":0.9613368055555556,"Mistral":0.9699479166666667,"Phi":0.9229918981481482},"Mistral":{"Qwen":0.9698900462962963,"Llama":0.9790104166666667,"Mistral":0.9700520833333333,"Phi":0.9029513888888889},"Phi":{"Qwen":0.9750694444444444,"Llama":0.9808564814814814,"Mistral":0.9739293981481482,"Phi":0.9348784722222222}},"best_layer":{"Qwen":11,"Llama":5,"Mistral":12,"Phi":13}},"first_32_words":{"acc4":{"Qwen":0.621,"Llama":0.651,"Mistral":0.599,"Phi":0.615},"self_vs_peer":{"Qwen":{"self":0.784,"strongest_peer":"Llama","strongest_peer_auc":0.808,"p_holm":1.0},"Llama":{"self":0.829,"strongest_peer":"Phi","strongest_peer_auc":0.838,"p_holm":1.0},"Mistral":{"self":0.877,"strongest_peer":"Llama","strongest_peer_auc":0.893,"p_holm":1.0},"Phi":{"self":0.821,"strongest_peer":"Llama","strongest_peer_auc":0.824,"p_holm":1.0}},"auc_matrix":{"Qwen":{"Qwen":0.7844733796296296,"Llama":0.8339293981481481,"Mistral":0.8778182870370371,"Phi":0.8051909722222222},"Llama":{"Qwen":0.8077256944444445,"Llama":0.8292939814814815,"Mistral":0.8929282407407408,"Phi":0.8235937499999999},"Mistral":{"Qwen":0.7695312499999999,"Llama":0.801238425925926,"Mistral":0.8768229166666667,"Phi":0.8173553240740741},"Phi":{"Qwen":0.7931192129629631,"Llama":0.8375347222222222,"Mistral":0.8792534722222223,"Phi":0.8213310185185185}},"best_layer":{"Qwen":10,"Llama":5,"Mistral":6,"Phi":6}},"text_baselines_acc4":{"char_1_5":0.771,"word_punct_1_2":0.74}},"steering":{"source":"legacy/compllm/results/wllfm/steer2_summary.json","unit":"change in log-odds of Yes per unit of k, late layer, all texts","judges":{"Qwen":{"author":-0.442,"yes_control":1.0,"null_lo":-0.271,"null_hi":0.276,"p_author":0.01,"layer":27},"Llama":{"author":0.059,"yes_control":0.24,"null_lo":-0.093,"null_hi":0.058,"p_author":0.109,"layer":31},"Mistral":{"author":-0.482,"yes_control":0.993,"null_lo":-0.306,"null_hi":0.311,"p_author":0.02,"layer":31},"Phi":{"author":0.043,"yes_control":0.27,"null_lo":-0.139,"null_hi":0.122,"p_author":0.554,"layer":31}}},"langllm":{"source":"LangLLM/results/{rq1_accuracy,rq7_ngram_accuracy,rq6_judge_by_language,rq6_judge_summary}.csv","chance":0.2,"by_language":[{"lang":"en","name":"English","rank":1,"features":0.717,"char_ngram":0.75,"word_ngram":0.783,"judge_mean":0.23,"judge_best":0.267},{"lang":"es","name":"Spanish","rank":2,"features":0.625,"char_ngram":0.733,"word_ngram":0.783,"judge_mean":0.207,"judge_best":0.217},{"lang":"zh","name":"Chinese","rank":3,"features":0.65,"char_ngram":0.867,"word_ngram":0.558,"judge_mean":0.208,"judge_best":0.233},{"lang":"ru","name":"Russian","rank":4,"features":0.65,"char_ngram":0.783,"word_ngram":0.825,"judge_mean":0.237,"judge_best":0.258},{"lang":"ja","name":"Japanese","rank":5,"features":0.708,"char_ngram":0.792,"word_ngram":0.683,"judge_mean":0.198,"judge_best":0.225},{"lang":"tr","name":"Turkish","rank":6,"features":0.592,"char_ngram":0.783,"word_ngram":0.833,"judge_mean":0.205,"judge_best":0.258},{"lang":"hi","name":"Hindi","rank":7,"features":0.639,"char_ngram":0.782,"word_ngram":0.731,"judge_mean":0.247,"judge_best":0.361}],"judges":[{"judge":"claude","acc":0.254,"self_claim_rate":0.087},{"judge":"grok","acc":0.219,"self_claim_rate":0.001},{"judge":"gemini","acc":0.212,"self_claim_rate":0.041},{"judge":"gpt","acc":0.206,"self_claim_rate":0.824},{"judge":"deepseek","acc":0.203,"self_claim_rate":0.079}]},"study1":{"source":"self-recognition-peer-baseline/results/{engine_a_results,engine_b_results}.json, results/revision/openweight/{classifier,summary}.json","style_rf_frontier":{"acc":0.863,"n":190,"length_share":0.631},"style_rf_openweight":{"pooled":0.725,"prose":0.858,"code":0.775,"short":0.625,"math":0.463},"judges_frontier":{"lineup":0.337,"single":0.306,"chance":0.2},"judges_openweight_yesno_auc":{"Qwen":0.449,"Llama":0.528,"Mistral":0.412,"Phi":0.53}}}</script>
 <script id="eval-data" type="application/json">{"frontier_ngram":{"overall":{"n":1629,"acc":0.8134},"chance":0.2,"by_source":{"api":{"n":600,"acc":0.79},"chat-app":{"n":190,"acc":0.8895},"langllm":{"n":839,"acc":0.8129}},"by_lang":{"en":{"n":910,"acc":0.8187},"es":{"n":120,"acc":0.75},"hi":{"n":119,"acc":0.8403},"ja":{"n":120,"acc":0.8083},"ru":{"n":120,"acc":0.775},"tr":{"n":120,"acc":0.775},"zh":{"n":120,"acc":0.8917}},"by_genre":{"code":{"n":100,"acc":0.65},"essay":{"n":839,"acc":0.8129},"math":{"n":100,"acc":0.82},"prose":{"n":490,"acc":0.9367},"short":{"n":100,"acc":0.37}},"by_length_chars":[{"lo":0,"hi":400,"n":84,"acc":0.5476},{"lo":400,"hi":800,"n":210,"acc":0.6714},{"lo":800,"hi":1600,"n":315,"acc":0.8476},{"lo":1600,"hi":3200,"n":806,"acc":0.8449},{"lo":3200,"hi":1000000000,"n":214,"acc":0.8879}],"calibration":[{"lo":0,"hi":0.4,"n":555,"acc":0.6036},{"lo":0.4,"hi":0.6,"n":601,"acc":0.8769},{"lo":0.6,"hi":0.8,"n":351,"acc":0.9715},{"lo":0.8,"hi":0.9,"n":97,"acc":1.0},{"lo":0.9,"hi":1.0,"n":25,"acc":1.0}],"confusion":{"labels":["GPT","Claude","Gemini","Grok","DeepSeek"],"matrix":[[277,12,3,20,14],[8,275,7,18,18],[6,9,278,13,20],[12,5,5,296,7],[29,46,25,27,199]]}},"frontier_style":{"overall":{"n":910,"acc":0.5714},"chance":0.2,"by_source":{"api":{"n":600,"acc":0.5683},"chat-app":{"n":190,"acc":0.6632},"langllm":{"n":120,"acc":0.4417}},"by_genre":{"code":{"n":100,"acc":0.51},"essay":{"n":120,"acc":0.4417},"math":{"n":100,"acc":0.45},"prose":{"n":490,"acc":0.6959},"short":{"n":100,"acc":0.3}},"by_length_chars":[{"lo":0,"hi":400,"n":84,"acc":0.3571},{"lo":400,"hi":800,"n":129,"acc":0.4574},{"lo":800,"hi":1600,"n":138,"acc":0.6377},{"lo":1600,"hi":3200,"n":362,"acc":0.6243},{"lo":3200,"hi":1000000000,"n":197,"acc":0.5939}],"calibration":[{"lo":0,"hi":0.4,"n":198,"acc":0.4242},{"lo":0.4,"hi":0.6,"n":405,"acc":0.5086},{"lo":0.6,"hi":0.8,"n":189,"acc":0.6561},{"lo":0.8,"hi":0.9,"n":53,"acc":0.8491},{"lo":0.9,"hi":1.0,"n":65,"acc":0.9385}],"confusion":{"labels":["GPT","Claude","Gemini","Grok","DeepSeek"],"matrix":[[113,25,19,14,11],[31,99,17,15,20],[13,13,108,20,28],[12,6,13,143,8],[28,43,39,15,57]]}},"openweight_ngram":{"overall":{"n":960,"acc":0.7688},"chance":0.25,"by_genre":{"code":{"n":160,"acc":0.8375},"math":{"n":160,"acc":0.7},"prose":{"n":480,"acc":0.8729},"short":{"n":160,"acc":0.4562}},"by_length_chars":[{"lo":0,"hi":400,"n":77,"acc":0.4286},{"lo":400,"hi":800,"n":169,"acc":0.6391},{"lo":800,"hi":1600,"n":200,"acc":0.78},{"lo":1600,"hi":3200,"n":462,"acc":0.8636},{"lo":3200,"hi":1000000000,"n":52,"acc":0.8077}],"calibration":[{"lo":0,"hi":0.4,"n":170,"acc":0.4647},{"lo":0.4,"hi":0.6,"n":407,"acc":0.7322},{"lo":0.6,"hi":0.8,"n":329,"acc":0.9331},{"lo":0.8,"hi":0.9,"n":46,"acc":1.0},{"lo":0.9,"hi":1.0,"n":8,"acc":1.0}],"confusion":{"labels":["Qwen","Llama","Mistral","Phi"],"matrix":[[185,17,7,31],[7,196,31,6],[7,25,198,10],[41,16,24,159]]}},"openweight_style":{"overall":{"n":960,"acc":0.6052},"chance":0.25,"by_genre":{"code":{"n":160,"acc":0.5375},"math":{"n":160,"acc":0.3187},"prose":{"n":480,"acc":0.7875},"short":{"n":160,"acc":0.4125}},"by_length_chars":[{"lo":0,"hi":400,"n":77,"acc":0.5584},{"lo":400,"hi":800,"n":169,"acc":0.3609},{"lo":800,"hi":1600,"n":200,"acc":0.45},{"lo":1600,"hi":3200,"n":462,"acc":0.7489},{"lo":3200,"hi":1000000000,"n":52,"acc":0.7885}],"calibration":[{"lo":0,"hi":0.4,"n":140,"acc":0.3714},{"lo":0.4,"hi":0.6,"n":463,"acc":0.5572},{"lo":0.6,"hi":0.8,"n":246,"acc":0.7154},{"lo":0.8,"hi":0.9,"n":66,"acc":0.8485},{"lo":0.9,"hi":1.0,"n":45,"acc":0.8667}],"confusion":{"labels":["Qwen","Llama","Mistral","Phi"],"matrix":[[163,23,25,29],[28,136,34,42],[18,42,154,26],[36,32,44,128]]}}}</script>
@@ -553,15 +479,27 @@ footer { margin-top: 96px; padding-top: 24px; border-top: 1px solid var(--line);
   const REPO = "https://github.com/adrian-erlikhman/llm-attribution/blob/main/";
   const LANG = { en: "English", es: "Spanish", ja: "Japanese", zh: "Chinese", ru: "Russian", tr: "Turkish", hi: "Hindi" };
   const PANEL = {
-    frontier: "Compares against GPT-5.5, Claude Opus 4.7, Gemini 3.5 Flash, Grok 4.3 and DeepSeek. Works in English, Spanish, Chinese, Russian, Japanese, Turkish and Hindi.",
-    openweight: "Compares against Qwen2.5-7B, Llama-3.1-8B, Mistral-7B and Phi-4-mini, the open models from the study. English.",
+    frontier: "Candidates: GPT-5.5, Claude Opus 4.7, Gemini 3.5 Flash, Grok 4.3, DeepSeek. Trained on 1,629 texts in English, Spanish, Chinese, Russian, Japanese, Turkish and Hindi.",
+    openweight: "Candidates: Qwen2.5-7B, Llama-3.1-8B, Mistral-7B, Phi-4-mini (4-bit, local). Trained on 960 English texts.",
   };
+  const TABS = ["classifier", "results", "methods", "code"];
   const models = {};
   const st = { panel: "frontier", sample: 0, view: "edit", last: null };
+  const best = (o) => Math.max(...Object.values(o)), worst = (o) => Math.min(...Object.values(o));
+
+  // ------------------------------------------------------------ tabs
+  const tabs = [...document.querySelectorAll('[role="tab"]')];
+  function show(id) {
+    tabs.forEach((t) => t.setAttribute("aria-selected", String(t.getAttribute("aria-controls") === id)));
+    TABS.forEach((s) => ($("#" + s).hidden = s !== id));
+    try { history.replaceState(null, "", "#" + id); } catch (e) {}
+  }
+  tabs.forEach((t) => t.addEventListener("click", () => show(t.getAttribute("aria-controls"))));
+  if (TABS.includes(location.hash.slice(1))) show(location.hash.slice(1));
 
   // ------------------------------------------------------------ input
   const ta = $("#text"), print = $("#print"), sel = $("#sample");
-  sel.innerHTML = `<option value="">Try a sample…</option>` + SAMPLES.map((s, i) =>
+  sel.innerHTML = `<option value="">Load a sample…</option>` + SAMPLES.map((s, i) =>
     `<option value="${i}">${esc(s.display)}, ${s.genre === "code" ? "code" : LANG[s.lang]}</option>`).join("");
   function loadSample(i) {
     st.sample = i; sel.value = i == null ? "" : String(i);
@@ -575,7 +513,7 @@ footer { margin-top: 96px; padding-top: 24px; border-top: 1px solid var(--line);
     $("#v-edit").setAttribute("aria-pressed", v === "edit");
     $("#v-print").setAttribute("aria-pressed", v === "print");
     ta.hidden = v !== "edit"; print.hidden = v !== "print";
-    $("#viewhint").textContent = v === "print" ? "Brighter = more typical of the result. Click the text to edit." : "";
+    $("#viewhint").textContent = v === "print" ? "Brighter = more typical of the predicted model. Click to edit." : "";
     if (v === "print") renderPrint(); else ta.focus();
   }
   $("#v-edit").addEventListener("click", () => setView("edit"));
@@ -616,45 +554,42 @@ footer { margin-top: 96px; padding-top: 24px; border-top: 1px solid var(--line);
     ["frontier", "openweight"].forEach((p) => $("#p-" + p).setAttribute("aria-pressed", String(p === st.panel)));
     $("#panel-desc").textContent = PANEL[st.panel];
     const text = ta.value, chars = text.trim().length, words = (text.trim().match(/\S+/g) || []).length;
-    $("#count").textContent = `${chars.toLocaleString()} characters · ${words.toLocaleString()} words`;
-    $("#cmd").textContent = `philology --panel ${st.panel}`;
+    $("#count").textContent = `${chars.toLocaleString()} characters, ${words.toLocaleString()} words`;
     const out = $("#out"), ng = models[st.panel + "_ngram"], sm = models[st.panel + "_style"];
     st.last = null;
-    if (!ng) { out.innerHTML = `<p class="muted">Loading the classifiers (4 MB)…</p>`; renderPrint(); return; }
-    if (chars < 20) { out.innerHTML = `<p class="muted">Paste a text on the left, upload a .txt file, or try a sample.</p>`; renderPrint(); return; }
+    if (!ng) { out.innerHTML = `<p class="muted">Loading classifier weights (4 MB)…</p>`; renderPrint(); return; }
+    if (chars < 20) { out.innerHTML = `<p class="muted">Paste a text, upload a .txt file, or load a sample.</p>`; renderPrint(); return; }
 
     const r = Attribution.charNgram(text, ng), ev = EVAL[st.panel + "_ngram"];
     const top = ng.display[r.top], n = ng.classes.length;
     st.last = { top: r.top };
     const lenB = bucket(ev.by_length_chars, chars), calB = bucket(ev.calibration, r.proba[r.top]);
     const s = st.sample != null ? SAMPLES[st.sample] : null;
-    let h = `<div><div class="who-label">Most likely written by</div>
-      <div class="who"><h2>${esc(top)}</h2><span class="p">${pct(r.proba[r.top])} probability</span></div></div>`;
+    let h = `<div><div class="who-label">Predicted author</div><div class="who"><h2>${esc(top)}</h2><span class="p">p = ${r.proba[r.top].toFixed(2)}</span></div></div>`;
     if (s && s.panel === st.panel) {
       const ok = ng.classes[r.top] === s.author;
-      h += `<div class="truth ${ok ? "ok" : "miss"}"><b class="st">${ok ? "Correct." : "Missed."}</b> This sample was written by <b>${esc(s.display)}</b>. Its prompt was kept out of training, so this is a fair test.</div>`;
+      h += `<div class="truth ${ok ? "ok" : "miss"}"><b class="st">${ok ? "Correct." : "Incorrect."}</b> Written by <b>${esc(s.display)}</b>. Prompt ${esc(s.prompt)} was held out of training.</div>`;
     } else if (s) {
-      h += `<div class="truth">This sample was written by <b>${esc(s.display)}</b>, which is in the other group. Switch above to test it.</div>`;
+      h += `<div class="truth">Written by <b>${esc(s.display)}</b>, which is a candidate in the other set. Switch candidates to test it.</div>`;
     }
     h += bars(r.proba, ng.display);
-    if (chars < 400) h += `<p class="warn">Short text: below about 400 characters, accuracy drops sharply.</p>`;
+    if (chars < 400) h += `<p class="warn">Under 400 characters: accuracy is much lower.</p>`;
     const calTxt = calB.lo === 0 ? `under ${pct(calB.hi)}` : calB.hi >= 1 ? `over ${pct(calB.lo)}` : `${pct(calB.lo)}–${pct(calB.hi)}`;
     h += `<div class="stats">
-      <div class="stat"><span class="k">Right at this length</span><span class="v num">${pct(lenB.acc)}</span><span class="s">of ${lenB.n} unseen texts this long</span></div>
-      <div class="stat"><span class="k">Right at this confidence</span><span class="v num">${pct(calB.acc)}</span><span class="s">when the top score was ${calTxt}</span></div></div>
-      <p class="help">Guessing would be right ${pct(1 / n)} of the time. These rates come from testing on prompts the classifier never saw.</p>`;
+      <div class="stat"><span class="k">Held-out accuracy, this length</span><span class="v num">${pct(lenB.acc)}</span><span class="s">${lenB.n} texts</span></div>
+      <div class="stat"><span class="k">Held-out accuracy, this confidence</span><span class="v num">${pct(calB.acc)}</span><span class="s">top p ${calTxt}</span></div></div>
+      <p class="help">Chance is ${pct(1 / n)}. Held-out means prompts the classifier never saw in training.</p>`;
     const chips = r.evidence(r.top, 12).map((g) => `<span class="chip">${esc(g.gram.replace(/\n/g, "↵"))}</span>`).join("");
-    h += `<div class="block"><div class="block-head"><h3>What gave it away</h3><button class="btn" type="button" id="show-hl" style="height:28px">Highlight in text</button></div>
-      <div class="chips">${chips || '<span class="help">Nothing stands out.</span>'}</div>
-      <p class="help">Character sequences in your text that ${esc(top)} uses more than the other models do.</p></div>`;
+    h += `<div class="block"><div class="block-head"><h3>Strongest n-grams for ${esc(top)}</h3><button class="btn" type="button" id="show-hl" style="height:28px">Show in text</button></div>
+      <div class="chips">${chips || '<span class="help">None.</span>'}</div>
+      <p class="help">Character sequences in the text with the largest weight toward ${esc(top)} relative to the other candidates.</p></div>`;
     if (isEnglish(text)) {
       const sr = Attribution.style(text, sm), sev = EVAL[st.panel + "_style"];
       const push = sr.push(sr.top).sort((a, b) => b.w - a.w);
       const prof = sm.profile[sm.classes[sr.top]];
       const rows = push.map((p) => `<tr><td>${esc(p.feature.replace(/_/g, " "))}</td><td class="r">${fmt(p.value)}</td><td class="r">${fmt(prof[p.feature][0])}</td><td class="r">${p.w > 0 ? "+" : ""}${p.w.toFixed(2)}</td></tr>`).join("");
-      h += `<div class="block"><div class="block-head"><h3>Second opinion: ${esc(sm.display[sr.top])}</h3><span class="help">${pct(sr.proba[sr.top])} · weaker, ${pct(sev.overall.acc)} accurate</span></div>
-        <p class="help">A separate classifier on 18 readable measurements, such as sentence length, commas and hedging words.</p>
-        <details><summary>See the measurements</summary><div class="tbl"><table><thead><tr><th>Measurement</th><th class="r">Your text</th><th class="r">${esc(sm.display[sr.top].split(" ")[0])} average</th><th class="r">Pull</th></tr></thead><tbody>${rows}</tbody></table></div></details></div>`;
+      h += `<div class="block"><div class="block-head"><h3>Style-feature classifier: ${esc(sm.display[sr.top])}</h3><span class="help">p = ${sr.proba[sr.top].toFixed(2)}, ${pct(sev.overall.acc)} held-out</span></div>
+        <details><summary>18 features</summary><div class="tbl"><table><thead><tr><th>Feature</th><th class="r">Text</th><th class="r">${esc(sm.display[sr.top].split(" ")[0])} mean</th><th class="r">Contribution</th></tr></thead><tbody>${rows}</tbody></table></div></details></div>`;
     }
     out.innerHTML = h;
     $("#show-hl").addEventListener("click", () => setView("print"));
@@ -664,7 +599,7 @@ footer { margin-top: 96px; padding-top: 24px; border-top: 1px solid var(--line);
   function renderPrint() {
     if (st.view !== "print") return;
     const ng = models[st.panel + "_ngram"], text = ta.value;
-    if (!ng || !st.last || !text.trim()) { print.textContent = text || "Nothing to highlight yet."; return; }
+    if (!ng || !st.last || !text.trim()) { print.textContent = text || "No text."; return; }
     const { chars, weights } = Attribution.fingerprint(text, ng, st.last.top);
     const pos = Array.from(weights).filter((w) => w > 0).sort((a, b) => a - b);
     const cap = pos.length ? pos[Math.floor(pos.length * 0.97)] || pos[pos.length - 1] : 1;
@@ -688,74 +623,100 @@ footer { margin-top: 96px; padding-top: 24px; border-top: 1px solid var(--line);
     }));
   }
 
-  // ------------------------------------------------------------ sections
-  function renderSteps() {
-    const F = EVAL.frontier_ngram, O = EVAL.openweight_ngram;
-    const steps = [
-      ["01", "Collect", "2,589 texts with known authors. Every model answered the same prompts, so only the writing style differs."],
-      ["02", "Break apart", "Each text is cut into every sequence of 1 to 4 characters, spaces and punctuation included, and turned into 40,000 numbers."],
-      ["03", "Learn", "Logistic regression learns how much each model uses each sequence compared with the others."],
-      ["04", "Score", "Your text goes through the same steps. Each model gets a score, and the scores become probabilities."],
-      ["05", "Test", `Tested on prompts it never saw: ${pct(F.overall.acc)} right for frontier models (guessing 20%), ${pct(O.overall.acc)} for open-weight (guessing 25%).`],
-    ];
-    $("#steps").innerHTML = steps.map(([k, t, p]) => `<div class="step"><span class="k">${k}</span><h3>${t}</h3><p>${p}</p></div>`).join("");
+  // ------------------------------------------------------------ results
+  function renderResults() {
+    const L = RES.likelihood, PR = RES.probes, LG = RES.langllm, S1 = RES.study1, ST = RES.steering;
+    const card = (title, text, table, src) => `<div class="res"><h2>${title}</h2><p>${text}</p><div class="tbl">${table}</div><span class="src">${esc(src)}</span></div>`;
+    const tbl = (head, rows, textCols = [0]) => `<table><thead><tr>${head.map((x, i) => `<th${textCols.includes(i) ? "" : ' class="r"'}>${x}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table>`;
+    const tr = (cells, textCols = [0]) => `<tr>${cells.map((c, i) => `<td${textCols.includes(i) ? "" : ' class="r"'}>${c}</td>`).join("")}</tr>`;
+    const sep = (label, ncol) => `<tr class="sep"><td colspan="${ncol}">${label}</td></tr>`;
+    let h = "";
+    h += card("Accuracy by method", "Proportion of held-out texts attributed to the correct model.",
+      tbl(["Method", "Access needed", "Accuracy", "Chance"], [
+        sep("Four open-weight models (Study 2, WLLFM)", 4),
+        tr(["Likelihood, prompt known", "log-probs from every candidate", pct(L.with_prompt.raw.acc, 1), "25%"], [0, 1]),
+        tr(["Likelihood, text only (z-scored)", "log-probs from every candidate", pct(L.text_only.zscore.acc, 1), "25%"], [0, 1]),
+        tr(["Hidden-state probe, best reader", "one open model's activations", pct(best(PR.full.acc4), 1), "25%"], [0, 1]),
+        tr(["Character n-grams", "text", pct(PR.text_baselines_acc4.char_1_5, 1), "25%"], [0, 1]),
+        tr(["Style features, random forest", "text", pct(S1.style_rf_openweight.pooled, 1), "25%"], [0, 1]),
+        sep("Five frontier models (Study 1, LangLLM, this page)", 4),
+        tr(["Style features, random forest (Study 1)", "text", pct(S1.style_rf_frontier.acc, 1), "20%"], [0, 1]),
+        tr(["Character n-grams (classifier on this page)", "text", pct(EVAL.frontier_ngram.overall.acc, 1), "20%"], [0, 1]),
+        tr(["LLM judge, lineup of five", "a judge model", pct(S1.judges_frontier.lineup, 1), "20%"], [0, 1]),
+        tr(["LLM judge, one text", "a judge model", pct(S1.judges_frontier.single, 1), "20%"], [0, 1]),
+      ].join(""), [0, 1]), "self-recognition-peer-baseline/results; legacy/compllm/results/wllfm; site/models/eval.json");
+    h += card("Likelihood confusion matrix", `Text-only likelihood attribution, scores z-scored per model. Rows are true authors, columns are predictions. ${pct(L.text_only.zscore.acc, 1)} correct; ${pct(L.with_prompt.raw.acc)} when each text is scored as the reply to its prompt.`,
+      tbl(["True author", ...L.labels], L.labels.map((l, i) => tr([l, ...L.text_only.zscore.confusion[i]])).join("")), L.source + " (n = 480)");
+    h += card("Hidden-state probes", "Four-way accuracy of a linear probe on each reader's activations at the final prompt token, and AUC for detecting the reader's own texts versus the strongest peer reader. No reader detects its own texts better than its strongest peer.",
+      tbl(["Reader", "Full text", "First 32 words", "Own AUC", "Strongest peer", "Peer AUC"], PR.readers.map((r) => { const v = PR.full.self_vs_peer[r];
+        return tr([r, pct(PR.full.acc4[r], 1), pct(PR.first_32_words.acc4[r], 1), v.self.toFixed(3), v.strongest_peer, v.strongest_peer_auc.toFixed(3)], [0, 4]); }).join(""), [0, 4]), PR.source);
+    h += card("Seven languages (LangLLM)", "Five-way accuracy on essays written natively in each language, leave-one-prompt-out. Chance is 20%.",
+      tbl(["Language", "Char n-grams", "Word n-grams", "21 UD features", "Best LLM judge"], LG.by_language.map((r) => tr([r.name, pct(r.char_ngram), pct(r.word_ngram), pct(r.features), pct(r.judge_best)])).join("")), LG.source);
+    h += card("Steering (WLLFM)", "Change in log-odds of answering yes to \"Did you write this text?\" per unit of added direction, at a late layer. The yes direction is a positive control; the random range is the central 95% of 100 random directions.",
+      tbl(["Judge", "Own-author direction", "Yes direction", "Random, 95% range"], Object.entries(ST.judges).map(([j, v]) =>
+        tr([j, (v.author > 0 ? "+" : "") + v.author.toFixed(2), "+" + v.yes_control.toFixed(2), `${v.null_lo.toFixed(2)} to ${v.null_hi.toFixed(2)}`])).join("")), ST.source);
+    h += card("Classifiers on this page", "Five-fold cross-validation with all texts from a prompt kept in the same fold.",
+      tbl(["Classifier", "Accuracy", "Texts", "Chance"], [["frontier_ngram", "Frontier, character n-grams"], ["frontier_style", "Frontier, style features (English)"], ["openweight_ngram", "Open-weight, character n-grams"], ["openweight_style", "Open-weight, style features"]].map(([k, name]) =>
+        tr([name, pct(EVAL[k].overall.acc, 1), EVAL[k].overall.n.toLocaleString(), pct(EVAL[k].chance)])).join("")), "site/models/eval.json");
+    $("#res").innerHTML = h;
   }
 
-  function renderFinds() {
-    const L = RES.likelihood, PR = RES.probes, LG = RES.langllm, S1 = RES.study1;
-    const best = (o) => Math.max(...Object.values(o)), worst = (o) => Math.min(...Object.values(o));
-    const judgeMax = Math.max(...LG.by_language.map((r) => r.judge_best));
-    const items = [
-      [pct(L.text_only.zscore.acc), "Likelihood names the author",
-        `Score a text under each of the four open models and pick the one that finds it most probable. ${pct(L.text_only.zscore.acc, 1)} right from the text alone, ${pct(L.with_prompt.raw.acc)} when the prompt is known.`, L.source],
-      [`${pct(worst(PR.full.acc4))}–${pct(best(PR.full.acc4))}`, "Any model's internals reveal the author",
-        "A simple probe on a model's internal state identifies which of four models wrote a text. A model is no better at spotting its own writing than its peers are.", PR.source],
-      [`${pct(Math.min(...LG.by_language.map((r) => r.char_ngram)))}–${pct(Math.max(...LG.by_language.map((r) => r.char_ngram)))}`, "It works in seven languages",
-        `Character patterns name the right author in English, Spanish, Chinese, Russian, Japanese, Turkish and Hindi, against 20% for guessing.`, LG.source],
-      [pct(S1.judges_frontier.lineup), "Asking a model barely beats guessing",
-        `Shown five texts and asked who wrote each, frontier models were right ${pct(S1.judges_frontier.lineup, 1)} of the time (guessing 20%). In other languages the best judge never passed ${pct(judgeMax)}.`, S1.source],
-    ];
-    $("#finds").innerHTML = items.map(([big, t, p, src]) => `<div class="find"><span class="big num">${big}</span><h3>${esc(t)}</h3><p>${p}</p><span class="src">${esc(src)}</span></div>`).join("") +
-      `<div class="find" style="grid-column:1/-1"><h3>Seven languages in detail</h3><div class="tbl"><table><thead><tr><th>Language</th><th class="r">Character patterns</th><th class="r">Word patterns</th><th class="r">Style measures</th><th class="r">Best judge model</th></tr></thead><tbody>${
-        LG.by_language.map((r) => `<tr><td>${esc(r.name)}</td><td class="r">${pct(r.char_ngram)}</td><td class="r">${pct(r.word_ngram)}</td><td class="r">${pct(r.features)}</td><td class="r">${pct(r.judge_best)}</td></tr>`).join("")
-      }</tbody></table></div></div>`;
-  }
-
+  // ------------------------------------------------------------ methods
   function renderMethods() {
     const L = RES.likelihood, PR = RES.probes, S1 = RES.study1;
-    const best = (o) => Math.max(...Object.values(o)), worst = (o) => Math.min(...Object.values(o));
-    const rows = [
-      ["Likelihood", "Run the text through each candidate model and see which finds it most probable. Needs every candidate model and a GPU.", `${pct(L.text_only.zscore.acc, 1)} · 4 models`],
-      ["Internal-state probe", "Read an open model's internal state while it reads the text, and classify it. Needs one open model, labelled texts and a GPU.", `${pct(best(PR.full.acc4), 1)} · 4 models`],
-      ["Character patterns", "This page. Counts 1–4 character sequences and weighs them per model. Needs only the text.", `${pct(EVAL.frontier_ngram.overall.acc, 1)} · 5 models`],
-      ["Style measures", "This page's second opinion. 18 readable measurements like sentence length and comma rate.", `${pct(S1.style_rf_frontier.acc, 1)} · 5 models*`],
-      ["Ask a model", "Show a model the text and ask who wrote it. Not included: barely above guessing.", `${pct(S1.judges_frontier.lineup, 1)} · 5 models`],
-    ];
-    $("#meth").innerHTML = rows.map(([t, p, a]) => `<div class="mrow"><h3>${t}</h3><p>${p}</p><span class="acc">${a}</span></div>`).join("") +
-      `<div class="help" style="padding-block:12px">* Study 1's random forest on English essays. This page's logistic regression on every genre gets ${pct(EVAL.frontier_style.overall.acc)}.</div>`;
+    const m = (name, meta, body) => `<div class="method"><div><h2>${name}</h2><div class="meta2">${meta}</div></div><div class="body">${body}</div></div>`;
+    const term = (lines) => `<div class="term"><pre>${lines}</pre></div>`;
+    let h = "";
+    h += m("Character n-grams", `${pct(EVAL.frontier_ngram.overall.acc, 1)} frontier<br>${pct(EVAL.openweight_ngram.overall.acc, 1)} open-weight<br>runs on this page`,
+      `<ol class="steps">
+        <li><b>Features.</b> Every sequence of 1–4 characters in the text, case and punctuation kept. Each is weighted by tf-idf (sublinear term frequency, inverse document frequency). The 40,000 most frequent sequences in training form the vocabulary.</li>
+        <li><b>Model.</b> Multinomial logistic regression (C = 10) on the L2-normalised tf-idf vector: one weight per sequence per candidate.</li>
+        <li><b>Prediction.</b> Score per candidate = intercept + Σ (feature value × weight); softmax gives the probabilities.</li>
+        <li><b>Evidence.</b> Each n-gram's contribution to the predicted candidate, relative to the mean over candidates. Spread over the characters it covers, these contributions sum exactly to the candidate's score minus the average score.</li>
+        <li><b>Evaluation.</b> Five-fold GroupKFold by prompt. The shipped weights are refit on all prompts except those used for the samples.</li>
+      </ol>` +
+      term(`<span class="w">text</span>  <span class="p">→</span>  1–4 char n-grams  <span class="p">→</span>  tf-idf (40,000)  <span class="p">→</span>  × weights  <span class="p">→</span>  softmax  <span class="p">→</span>  <span class="w">P(model)</span>`));
+    h += m("Style features", `${pct(EVAL.frontier_style.overall.acc, 1)} frontier, logistic regression<br>${pct(S1.style_rf_frontier.acc, 1)} Study 1, random forest<br>runs on this page`,
+      `<p>18 measurements from CompLLM: word count, type-token ratio, hapax rate, word and sentence length, sentence-length spread, sentence count, passive rate, Flesch reading ease, Flesch–Kincaid grade, Gunning fog, hedges, paragraph count and length, and commas, em dashes, colons and semicolons per 100 words. Standardised, then multinomial logistic regression. English only. LangLLM uses 21 Universal Dependencies features instead, which are defined in every language.</p>`);
+    h += m("Likelihood", `${pct(L.text_only.zscore.acc, 1)} text only<br>${pct(L.with_prompt.raw.acc)} with prompt<br>GPU`,
+      `<p>Each candidate model scores the text: the mean log-probability of its tokens, either alone or as the reply to its prompt. Each candidate's scores are z-scored over the corpus, and the text is attributed to the highest. Requires access to every candidate's log-probabilities.</p>` +
+      term(`<span class="c"># reproduce from the saved scores</span>
+<span class="p">$</span> python examples/likelihood_attribution.py path/to/self-recognition-peer-baseline
+<span class="c"># score new texts</span>
+<span class="p">$</span> python legacy/compllm/src/revision/score_likelihood.py`));
+    h += m("Hidden-state probe", `${pct(worst(PR.full.acc4), 1)}–${pct(best(PR.full.acc4), 1)}<br>GPU`,
+      `<p>One forward pass of an open model over the yes/no prompt "Did you write this text?" containing the text. The hidden state at the final prompt token is taken from every layer. A ridge read-out per candidate (standardised features, penalty chosen by GCV) is trained with five prompt-grouped folds; the layer with the best mean AUC is used. Any of the four models works as the reader.</p>` +
+      term(`<span class="p">$</span> python legacy/compllm/src/wllfm/extract_states.py
+<span class="p">$</span> python legacy/compllm/src/wllfm/probe.py --boot 2000`));
+    h += m("LLM judges", `${pct(S1.judges_frontier.single, 1)}–${pct(S1.judges_frontier.lineup, 1)}<br>chance 20%`,
+      `<p>A model is shown one text, or a position-balanced lineup of five, and asked which model wrote it; or asked "Did you write this text?". Close to chance in every setting and language, with a strong bias toward one favourite answer. Not included on this page.</p>`);
+    $("#meth").innerHTML = h;
   }
 
   function renderCode() {
     const rows = [
-      ["This page, in the browser", "site/attribution.js"],
-      ["This page, training", "site/build/train_models.py"],
-      ["Likelihood", "legacy/compllm/src/revision/backends.py#L300-L352"],
-      ["Likelihood, one text", "examples/likelihood_attribution.py"],
-      ["Internal states", "legacy/compllm/src/wllfm/extract_states.py#L104-L146"],
-      ["Probe", "legacy/compllm/src/wllfm/probe.py#L80-L93"],
-      ["Style measures", "legacy/compllm/src/features.py#L157-L193"],
-      ["Every method, with line links", "ALGORITHMS.md"],
+      ["Classifier on this page (browser)", "site/attribution.js", "charNgram, fingerprint, style"],
+      ["Classifier on this page (training)", "site/build/train_models.py", "train_ngram, train_style"],
+      ["Likelihood scoring", "legacy/compllm/src/revision/backends.py#L300-L352", "HFBackend.score"],
+      ["Likelihood, single text", "examples/likelihood_attribution.py", "attribute"],
+      ["Hidden-state extraction", "legacy/compllm/src/wllfm/extract_states.py#L104-L146", "main"],
+      ["Probe", "legacy/compllm/src/wllfm/probe.py#L80-L93", "oof_scores"],
+      ["Character n-grams (study)", "legacy/compllm/src/wllfm/robustness.py#L112-L131", "text_baselines"],
+      ["Style features, English", "legacy/compllm/src/features.py#L157-L193", "extract"],
+      ["Style features, any language", "legacy/langllm/langllm/features.py#L154-L219", "extract"],
+      ["Judge prompts", "legacy/compllm/src/revision/conditions.py#L46-L116", "lineup_prompt, binary_prompt"],
+      ["Steering", "legacy/compllm/src/wllfm/steer2.py#L60-L87", "directions"],
+      ["Index of all methods", "ALGORITHMS.md", ""],
     ];
-    $("#files").innerHTML = rows.map(([m, f]) => `<a class="file" href="${REPO + f}" target="_blank" rel="noopener"><span>${esc(m)}</span><span class="f">${esc(f.replace(/#.*/, ""))}</span></a>`).join("");
+    $("#files").innerHTML = rows.map(([m, f, fn]) => `<a href="${REPO + f}" target="_blank" rel="noopener"><span>${esc(m)}</span><span class="f">${esc(f.replace(/#.*/, ""))}</span><span class="fn">${esc(fn)}</span></a>`).join("");
   }
 
-  renderSteps();
-  renderFinds();
+  renderResults();
   renderMethods();
   renderCode();
   loadSample(0);
   loadModels().then(update).catch((e) => {
-    $("#out").innerHTML = `<p class="warn">The classifiers did not load: ${esc(e.message)}. If you opened the file directly, serve the folder instead (python -m http.server).</p>`;
+    $("#out").innerHTML = `<p class="warn">Could not load the classifier weights: ${esc(e.message)}. Serve the folder over HTTP rather than opening the file directly.</p>`;
   });
 })();
 </script>
