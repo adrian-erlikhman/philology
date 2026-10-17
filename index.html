@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Philology</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Which language model wrote this text? A terminal-style tool built from the CompLLM, LangLLM and WLLFM studies.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+/* A terminal. One monospace face, one dark screen, plain text output.
+   Colour only where a terminal would use it: dim for secondary text,
+   bold for the answer, green/red for right/wrong, yellow for evidence. */
+:root {
+  color-scheme: dark;
+  --bg: #0c0c0c;
+  --fg: #d0d0d0;
+  --dim: #7a7a7a;
+  --faint: #2a2a2a;
+  --bold: #ffffff;
+  --yellow: #e5c07b;
+  --green: #98c379;
+  --red: #e06c75;
+  --cyan: #56b6c2;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { overflow-x: clip; }
+body {
+  background: var(--bg); color: var(--fg); font: 14px/1.6 var(--mono); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 48px;
+}
+.term { max-width: 920px; margin: 0 auto; }
+a { color: var(--cyan); text-decoration: none; }
+a:hover { text-decoration: underline; }
+:focus-visible { outline: 1px solid var(--fg); outline-offset: 2px; }
+.dim { color: var(--dim); }
+.b { color: var(--bold); font-weight: 700; }
+.y { color: var(--yellow); }
+.g { color: var(--green); }
+.r { color: var(--red); }
+.line { white-space: pre-wrap; overflow-wrap: anywhere; min-height: 1.6em; }
+.pre { white-space: pre; overflow-x: auto; }
+.gap { height: 1.6em; }
+hr { border: 0; border-top: 1px solid var(--faint); margin: 12px 0; }
+
+nav { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+nav button { font: inherit; color: var(--dim); background: none; border: 0; padding: 0; cursor: pointer; }
+nav button:hover { color: var(--fg); }
+nav button[aria-current="page"] { color: var(--bg); background: var(--fg); padding: 0 4px; }
+
+.opts { display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: center; }
+.opts button, .opts label.btn { font: inherit; color: var(--dim); background: none; border: 0; padding: 0; cursor: pointer; }
+.opts button:hover, .opts label.btn:hover { color: var(--fg); }
+.opts button[aria-pressed="true"] { color: var(--fg); }
+.opts button[aria-pressed="true"]::before { content: "[x] "; }
+.opts button[aria-pressed="false"]::before { content: "[ ] "; }
+select { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--faint); padding: 1px 4px; max-width: 100%; }
+
+textarea {
+  display: block; width: 100%; min-height: 260px; resize: vertical; margin: 8px 0 4px; padding: 10px 12px;
+  font: 13.5px/1.6 var(--mono); color: var(--fg); background: #111; border: 1px solid var(--faint); border-radius: 0;
+}
+textarea:focus { outline: none; border-color: #555; }
+textarea.drag { border-color: var(--yellow); }
+details > summary { cursor: pointer; color: var(--dim); list-style: none; }
+details > summary::-webkit-details-marker { display: none; }
+details > summary::before { content: "+ "; }
+details[open] > summary::before { content: "- "; }
+details > summary:hover { color: var(--fg); }
+</style>
+
+<div class="term">
+  <div class="line"><span class="b">philology</span> <span class="dim">0.1, which model wrote this text? private preview</span></div>
+  <nav aria-label="Commands">
+    <button type="button" data-tab="attribute" aria-current="page">attribute</button>
+    <button type="button" data-tab="results">results</button>
+    <button type="button" data-tab="methods">methods</button>
+    <button type="button" data-tab="code">code</button>
+  </nav>
+  <hr>
+
+  <!-- ============================================================ attribute -->
+  <section id="attribute">
+    <div class="line"><span class="dim">$</span> philology attribute <span class="dim" id="flags"></span></div>
+    <div class="opts">
+      <span class="dim">panel:</span>
+      <button type="button" id="p-frontier" aria-pressed="true">frontier (5 models)</button>
+      <button type="button" id="p-openweight" aria-pressed="false">open-weight (4 models)</button>
+    </div>
+    <div class="opts">
+      <label class="dim" for="sample">sample:</label>
+      <select id="sample"></select>
+      <label class="btn" for="file">upload .txt</label>
+      <input id="file" type="file" accept=".txt,.md,text/plain" hidden>
+      <button type="button" id="clear">clear</button>
+    </div>
+    <label for="text" class="dim" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Text to attribute</label>
+    <textarea id="text" spellcheck="false" placeholder="paste text here, or drop a .txt file"></textarea>
+    <div class="line dim" id="count"></div>
+    <div class="gap"></div>
+    <div id="out"></div>
+  </section>
+
+  <!-- ============================================================ results -->
+  <section id="results" hidden>
+    <div class="line"><span class="dim">$</span> philology results</div>
+    <div id="res"></div>
+  </section>
+
+  <!-- ============================================================ methods -->
+  <section id="methods" hidden>
+    <div class="line"><span class="dim">$</span> philology methods</div>
+    <div id="meth"></div>
+  </section>
+
+  <!-- ============================================================ code -->
+  <section id="code" hidden>
+    <div class="line"><span class="dim">$</span> philology code</div>
+    <div id="files"></div>
+  </section>
+</div>
+
+<script id="results-data" type="application/json">{"likelihood":{"source":"self-recognition-peer-baseline/results/revision/openweight/likelihood.csv","labels":["Qwen","Llama","Mistral","Phi"],"with_prompt":{"n":480,"raw":{"acc":1.0,"confusion":[[120,0,0,0],[0,120,0,0],[0,0,120,0],[0,0,0,120]]},"zscore":{"acc":0.998,"confusion":[[120,0,0,0],[0,119,0,1],[0,0,120,0],[0,0,0,120]]}},"text_only":{"n":480,"raw":{"acc":0.84,"confusion":[[118,0,2,0],[4,107,9,0],[0,0,120,0],[22,0,40,58]]},"zscore":{"acc":0.95,"confusion":[[114,0,2,4],[2,117,0,1],[0,0,120,0],[5,0,10,105]]}}},"probes":{"source":"legacy/compllm/results/wllfm/probe_summary.json (+ _w32)","readers":["Qwen","Llama","Mistral","Phi"],"full":{"acc4":{"Qwen":0.87,"Llama":0.848,"Mistral":0.841,"Phi":0.865},"self_vs_peer":{"Qwen":{"self":0.975,"strongest_peer":"Phi","strongest_peer_auc":0.975,"p_holm":1.0},"Llama":{"self":0.961,"strongest_peer":"Qwen","strongest_peer_auc":0.983,"p_holm":1.0},"Mistral":{"self":0.97,"strongest_peer":"Phi","strongest_peer_auc":0.974,"p_holm":1.0},"Phi":{"self":0.935,"strongest_peer":"Llama","strongest_peer_auc":0.923,"p_holm":0.448}},"auc_matrix":{"Qwen":{"Qwen":0.9747858796296297,"Llama":0.9827951388888889,"Mistral":0.9681655092592591,"Phi":0.9182581018518519},"Llama":{"Qwen":0.9630844907407408,"Llama":0.9613368055555556,"Mistral":0.9699479166666667,"Phi":0.9229918981481482},"Mistral":{"Qwen":0.9698900462962963,"Llama":0.9790104166666667,"Mistral":0.9700520833333333,"Phi":0.9029513888888889},"Phi":{"Qwen":0.9750694444444444,"Llama":0.9808564814814814,"Mistral":0.9739293981481482,"Phi":0.9348784722222222}},"best_layer":{"Qwen":11,"Llama":5,"Mistral":12,"Phi":13}},"first_32_words":{"acc4":{"Qwen":0.621,"Llama":0.651,"Mistral":0.599,"Phi":0.615},"self_vs_peer":{"Qwen":{"self":0.784,"strongest_peer":"Llama","strongest_peer_auc":0.808,"p_holm":1.0},"Llama":{"self":0.829,"strongest_peer":"Phi","strongest_peer_auc":0.838,"p_holm":1.0},"Mistral":{"self":0.877,"strongest_peer":"Llama","strongest_peer_auc":0.893,"p_holm":1.0},"Phi":{"self":0.821,"strongest_peer":"Llama","strongest_peer_auc":0.824,"p_holm":1.0}},"auc_matrix":{"Qwen":{"Qwen":0.7844733796296296,"Llama":0.8339293981481481,"Mistral":0.8778182870370371,"Phi":0.8051909722222222},"Llama":{"Qwen":0.8077256944444445,"Llama":0.8292939814814815,"Mistral":0.8929282407407408,"Phi":0.8235937499999999},"Mistral":{"Qwen":0.7695312499999999,"Llama":0.801238425925926,"Mistral":0.8768229166666667,"Phi":0.8173553240740741},"Phi":{"Qwen":0.7931192129629631,"Llama":0.8375347222222222,"Mistral":0.8792534722222223,"Phi":0.8213310185185185}},"best_layer":{"Qwen":10,"Llama":5,"Mistral":6,"Phi":6}},"text_baselines_acc4":{"char_1_5":0.771,"word_punct_1_2":0.74}},"steering":{"source":"legacy/compllm/results/wllfm/steer2_summary.json","unit":"change in log-odds of Yes per unit of k, late layer, all texts","judges":{"Qwen":{"author":-0.442,"yes_control":1.0,"null_lo":-0.271,"null_hi":0.276,"p_author":0.01,"layer":27},"Llama":{"author":0.059,"yes_control":0.24,"null_lo":-0.093,"null_hi":0.058,"p_author":0.109,"layer":31},"Mistral":{"author":-0.482,"yes_control":0.993,"null_lo":-0.306,"null_hi":0.311,"p_author":0.02,"layer":31},"Phi":{"author":0.043,"yes_control":0.27,"null_lo":-0.139,"null_hi":0.122,"p_author":0.554,"layer":31}}},"langllm":{"source":"LangLLM/results/{rq1_accuracy,rq7_ngram_accuracy,rq6_judge_by_language,rq6_judge_summary}.csv","chance":0.2,"by_language":[{"lang":"en","name":"English","rank":1,"features":0.717,"char_ngram":0.75,"word_ngram":0.783,"judge_mean":0.23,"judge_best":0.267},{"lang":"es","name":"Spanish","rank":2,"features":0.625,"char_ngram":0.733,"word_ngram":0.783,"judge_mean":0.207,"judge_best":0.217},{"lang":"zh","name":"Chinese","rank":3,"features":0.65,"char_ngram":0.867,"word_ngram":0.558,"judge_mean":0.208,"judge_best":0.233},{"lang":"ru","name":"Russian","rank":4,"features":0.65,"char_ngram":0.783,"word_ngram":0.825,"judge_mean":0.237,"judge_best":0.258},{"lang":"ja","name":"Japanese","rank":5,"features":0.708,"char_ngram":0.792,"word_ngram":0.683,"judge_mean":0.198,"judge_best":0.225},{"lang":"tr","name":"Turkish","rank":6,"features":0.592,"char_ngram":0.783,"word_ngram":0.833,"judge_mean":0.205,"judge_best":0.258},{"lang":"hi","name":"Hindi","rank":7,"features":0.639,"char_ngram":0.782,"word_ngram":0.731,"judge_mean":0.247,"judge_best":0.361}],"judges":[{"judge":"claude","acc":0.254,"self_claim_rate":0.087},{"judge":"grok","acc":0.219,"self_claim_rate":0.001},{"judge":"gemini","acc":0.212,"self_claim_rate":0.041},{"judge":"gpt","acc":0.206,"self_claim_rate":0.824},{"judge":"deepseek","acc":0.203,"self_claim_rate":0.079}]},"study1":{"source":"self-recognition-peer-baseline/results/{engine_a_results,engine_b_results}.json, results/revision/openweight/{classifier,summary}.json","style_rf_frontier":{"acc":0.863,"n":190,"length_share":0.631},"style_rf_openweight":{"pooled":0.725,"prose":0.858,"code":0.775,"short":0.625,"math":0.463},"judges_frontier":{"lineup":0.337,"single":0.306,"chance":0.2},"judges_openweight_yesno_auc":{"Qwen":0.449,"Llama":0.528,"Mistral":0.412,"Phi":0.53}}}</script>
+<script id="eval-data" type="application/json">{"frontier_ngram":{"overall":{"n":1629,"acc":0.8134},"chance":0.2,"by_source":{"api":{"n":600,"acc":0.79},"chat-app":{"n":190,"acc":0.8895},"langllm":{"n":839,"acc":0.8129}},"by_lang":{"en":{"n":910,"acc":0.8187},"es":{"n":120,"acc":0.75},"hi":{"n":119,"acc":0.8403},"ja":{"n":120,"acc":0.8083},"ru":{"n":120,"acc":0.775},"tr":{"n":120,"acc":0.775},"zh":{"n":120,"acc":0.8917}},"by_genre":{"code":{"n":100,"acc":0.65},"essay":{"n":839,"acc":0.8129},"math":{"n":100,"acc":0.82},"prose":{"n":490,"acc":0.9367},"short":{"n":100,"acc":0.37}},"by_length_chars":[{"lo":0,"hi":400,"n":84,"acc":0.5476},{"lo":400,"hi":800,"n":210,"acc":0.6714},{"lo":800,"hi":1600,"n":315,"acc":0.8476},{"lo":1600,"hi":3200,"n":806,"acc":0.8449},{"lo":3200,"hi":1000000000,"n":214,"acc":0.8879}],"calibration":[{"lo":0,"hi":0.4,"n":555,"acc":0.6036},{"lo":0.4,"hi":0.6,"n":601,"acc":0.8769},{"lo":0.6,"hi":0.8,"n":351,"acc":0.9715},{"lo":0.8,"hi":0.9,"n":97,"acc":1.0},{"lo":0.9,"hi":1.0,"n":25,"acc":1.0}],"confusion":{"labels":["GPT","Claude","Gemini","Grok","DeepSeek"],"matrix":[[277,12,3,20,14],[8,275,7,18,18],[6,9,278,13,20],[12,5,5,296,7],[29,46,25,27,199]]}},"frontier_style":{"overall":{"n":910,"acc":0.5714},"chance":0.2,"by_source":{"api":{"n":600,"acc":0.5683},"chat-app":{"n":190,"acc":0.6632},"langllm":{"n":120,"acc":0.4417}},"by_genre":{"code":{"n":100,"acc":0.51},"essay":{"n":120,"acc":0.4417},"math":{"n":100,"acc":0.45},"prose":{"n":490,"acc":0.6959},"short":{"n":100,"acc":0.3}},"by_length_chars":[{"lo":0,"hi":400,"n":84,"acc":0.3571},{"lo":400,"hi":800,"n":129,"acc":0.4574},{"lo":800,"hi":1600,"n":138,"acc":0.6377},{"lo":1600,"hi":3200,"n":362,"acc":0.6243},{"lo":3200,"hi":1000000000,"n":197,"acc":0.5939}],"calibration":[{"lo":0,"hi":0.4,"n":198,"acc":0.4242},{"lo":0.4,"hi":0.6,"n":405,"acc":0.5086},{"lo":0.6,"hi":0.8,"n":189,"acc":0.6561},{"lo":0.8,"hi":0.9,"n":53,"acc":0.8491},{"lo":0.9,"hi":1.0,"n":65,"acc":0.9385}],"confusion":{"labels":["GPT","Claude","Gemini","Grok","DeepSeek"],"matrix":[[113,25,19,14,11],[31,99,17,15,20],[13,13,108,20,28],[12,6,13,143,8],[28,43,39,15,57]]}},"openweight_ngram":{"overall":{"n":960,"acc":0.7688},"chance":0.25,"by_genre":{"code":{"n":160,"acc":0.8375},"math":{"n":160,"acc":0.7},"prose":{"n":480,"acc":0.8729},"short":{"n":160,"acc":0.4562}},"by_length_chars":[{"lo":0,"hi":400,"n":77,"acc":0.4286},{"lo":400,"hi":800,"n":169,"acc":0.6391},{"lo":800,"hi":1600,"n":200,"acc":0.78},{"lo":1600,"hi":3200,"n":462,"acc":0.8636},{"lo":3200,"hi":1000000000,"n":52,"acc":0.8077}],"calibration":[{"lo":0,"hi":0.4,"n":170,"acc":0.4647},{"lo":0.4,"hi":0.6,"n":407,"acc":0.7322},{"lo":0.6,"hi":0.8,"n":329,"acc":0.9331},{"lo":0.8,"hi":0.9,"n":46,"acc":1.0},{"lo":0.9,"hi":1.0,"n":8,"acc":1.0}],"confusion":{"labels":["Qwen","Llama","Mistral","Phi"],"matrix":[[185,17,7,31],[7,196,31,6],[7,25,198,10],[41,16,24,159]]}},"openweight_style":{"overall":{"n":960,"acc":0.6052},"chance":0.25,"by_genre":{"code":{"n":160,"acc":0.5375},"math":{"n":160,"acc":0.3187},"prose":{"n":480,"acc":0.7875},"short":{"n":160,"acc":0.4125}},"by_length_chars":[{"lo":0,"hi":400,"n":77,"acc":0.5584},{"lo":400,"hi":800,"n":169,"acc":0.3609},{"lo":800,"hi":1600,"n":200,"acc":0.45},{"lo":1600,"hi":3200,"n":462,"acc":0.7489},{"lo":3200,"hi":1000000000,"n":52,"acc":0.7885}],"calibration":[{"lo":0,"hi":0.4,"n":140,"acc":0.3714},{"lo":0.4,"hi":0.6,"n":463,"acc":0.5572},{"lo":0.6,"hi":0.8,"n":246,"acc":0.7154},{"lo":0.8,"hi":0.9,"n":66,"acc":0.8485},{"lo":0.9,"hi":1.0,"n":45,"acc":0.8667}],"confusion":{"labels":["Qwen","Llama","Mistral","Phi"],"matrix":[[163,23,25,29],[28,136,34,42],[18,42,154,26],[36,32,44,128]]}}}</script>
+<script id="samples-data" type="application/json">[{"panel":"frontier","author":"GPT","display":"GPT-5.5","lang":"en","genre":"prose","source":"api","prompt":"H5","text":"Consciousness poses an explanatory challenge that is not fully addressed by current physicalist or functionalist frameworks because the problem of subjective experience is conceptually distinct from the problems of explaining cognition, behavior, and information processing. The so-called easy problems concern how organisms discriminate stimuli, integrate information, report internal states, control attention, guide action, form memories, and produce verbal judgments. These are difficult scientific problems, but they are problems about function: they ask what mechanisms do and how they do it. A functional account can explain how the brain processes visual input, how it identifies colors, how it stores information, or how it generates the statement “I see red.” But such an account does not thereby explain why any of this processing is accompanied by felt experience. It explains the causal organization and behavioral capacities of the system, not why there is something it is like to be that system. The hard problem remains because subjective experience is not captured merely by specifying input-output relations, computational roles, neural activations, or cognitive functions. Even a complete account of what the brain does would still leave open the question of why those doings are accompanied by phenomenal consciousness at all.\n\nThe conceivability of philosophical zombies reinforces this explanatory gap by showing that phenomenal consciousness is not logically entailed by a complete physical description. A philosophical zombie is imagined as a being physically, functionally, and behaviorally identical to a conscious human being, but lacking inner experience altogether. It speaks about pain, withdraws from injury, reports visual sensations, and processes information exactly as a conscious person does, yet there is nothing it is like to be that being. The point of the zombie scenario is not that such beings actually exist, but that the physical and functional facts appear conceivable without the phenomenal facts. If a complete physical duplicate of a conscious human can be coherently conceived as lacking consciousness, then consciousness is not analytically or logically guaranteed by the physical description alone. This suggests that any identification of phenomenal properties with physical properties cannot be a necessary identity discoverable purely from the concepts involved. At most, it would be a contingent identity: a correlation or lawful connection holding in our world, rather than something made inevitable by the physical facts themselves.\n\nMary’s Room shows the same challenge from the standpoint of knowledge. Mary is a brilliant scientist who knows every physical fact about color vision while confined to a black-and-white environment. She knows all the neuroscience, optics, chemistry, and functional organization involved in seeing red. She can describe the wavelengths, retinal responses, neural pathways, representational structures, and behavioral dispositions associated with color perception. Yet when she leaves the room and sees red for the first time, she learns what red looks like. This new knowledge is not merely further knowledge of a physical process, since by stipulation she already possessed all the physical information. What she lacked was knowledge of the phenomenal character of the experience. The case therefore indicates that complete physical knowledge does not entail complete phenomenal knowledge. Phenomenal facts are epistemically irreducible to physical facts: knowing all the objective, third-person truths does not automatically yield knowledge of the subjective, first-person character of experience. This does not by itself establish ontological dualism, but it does show that consciousness resists full explanation within frameworks that identify understanding with physical description or functional analysis alone."},{"panel":"frontier","author":"Claude","display":"Claude Opus 4.7","lang":"en","genre":"essay","source":"langllm","prompt":"L:P12","text":"Banning private cars from city centres is one of the most transformative urban policies available to modern municipalities. Far from being a punitive measure against motorists, it is a rational reallocation of scarce public space that delivers measurable benefits in liveability, public health, and economic vitality. The evidence from cities that have taken this step is compelling, and the arguments in its favour deserve serious consideration.\n\nThe most immediate gain is the liberation of street space for uses that serve far more people than private vehicles ever could. A single traffic lane occupied by cars moving one or two passengers at a time can, once reclaimed, accommodate wide pedestrian promenades, protected cycle lanes, tram corridors, outdoor seating, street markets, and public greenery. Oslo, which removed most on-street parking from its centre, converted these spaces into plazas, bike lanes, and expanded pavements, transforming previously congested streets into places where people linger rather than merely pass through. Space is finite in dense urban cores, and dedicating the majority of it to storing and moving private cars is an indefensible use of a precious civic resource.\n\nThe environmental improvements that follow such bans are neither speculative nor slow to materialise. When Madrid restricted private cars from its central district in 2018, nitrogen dioxide levels fell by around 15 percent within months. Paris and Brussels have documented similar declines in both air pollutants and ambient noise following pedestrianisation schemes. Reductions in noise pollution, often overlooked, yield real benefits for cardiovascular health, sleep quality, and cognitive performance among residents. These improvements accrue quickly precisely because the largest single source of central-city pollution — combustion-engine traffic — is simply removed.\n\nPerhaps most surprising to sceptics is the consistent finding that retail footfall rises after such bans. Studies in Copenhagen, Madrid, and numerous German cities show that pedestrians and cyclists, though they may spend less per visit, visit more frequently and cumulatively outspend drivers. Shopkeepers routinely overestimate the share of their customers arriving by car. When streets become pleasant environments to walk and dwell in, people stay longer and spend more. Banning private cars is therefore not just an environmental policy but a proven engine of urban economic renewal."},{"panel":"frontier","author":"DeepSeek","display":"DeepSeek","lang":"ja","genre":"essay","source":"langllm","prompt":"L:P12","text":"## 私的自動車の乗り入れ禁止、都市再生への戦略的転換\n\n都市中心部への私的自動車の乗り入れ禁止は、単なる交通規制ではない。それは、空間の正義、環境の質、そして経済活力を同時に回復させる、計画的な都市再編の第一歩である。本稿では、この政策に賛成する立場から、三つの論拠を提示する。\n\n第一に、乗り入れ禁止によって解放された道路空間は、歩行者、自転車利用者、そして商業活動へと再配分される。近代都市計画は長らく、道路空間の優先権を私的自動車に与えてきた。しかし、都市中心部は元来、多様な主体が交わり、滞留し、交流する場である。私的車両の排除により、車線は歩行者専用道や自転車レーン、カフェテラス、緑地帯へと転換される。パリの「セーヌ川右岸」やニューヨークの「タイムズスクエア」における歩行者空間化の試みは、わずかな面積の再配分が、都市の回遊性と公共空間の質を飛躍的に向上させることを実証した。これは、交通需要管理の枠組みにおけるモーダルシフトの促進のみならず、場所の価値（プレイス・バリュー）を高める戦略として評価できる。\n\n第二に、乗り入れ禁止区域では、空気質と騒音レベルの改善が数ヶ月以内という短期間に観測される。自動車排出ガスに由来する二酸化窒素や微小粒子状物質（PM2.5）は、呼吸器系疾患の主要な環境リスク因子である。道路空間の再配分を伴う交通制限が実施された地域では、交通流の減少に伴い、これらの大気汚染物質濃度が有意に低下することが、欧州環境庁の報告書でも確認されている。同時に、交通騒音は50デシベル以下の環境基準達成を阻害する最大要因だが、車両通行の大幅な減少により、沿道の騒音レベルは短期間で顕著に改善する。この環境改善は、住民の健康リスク低減に直結し、医療費削減という社会的便益ももたらす。\n\n第三に、乗り入れ禁止を実施した都市では、小売業の客足が減少するどころか、むしろ増加しているという実績が存在する。自動車利用者の来訪減少を懸念する声は根強いが、実証データはこの懸念を覆す。歩行者と自転車利用者は、自動車利用者に比べ来店頻度が高く、一回あたりの滞在時間が長い。コペンハーゲンのストロイエや東京の銀座における歩行者天国の成功例、あるいはスペインのポンテベドラやオスロ都心部のデータは、歩行者専用化が商業売上の増加と空き店舗率の低下をもたらすことを示している。自動車のアクセス性よりも、快適で安全な歩行環境こそが、都市型小売業の競争力を規定する時代となったのである。\n\n以上の三点は、私的自動車の乗り入れ禁止が、都市の持続可能性と経済的活力を両立させる有効な政策手段であることを示している。自動車中心の都市構造からの脱却こそ、成熟した都市の未来像である。"},{"panel":"frontier","author":"Gemini","display":"Gemini 3.5 Flash","lang":"en","genre":"code","source":"api","prompt":"C9","text":"```python\ndef rotate_matrix(matrix: list[list[int]]) -> list[list[int]]:\n    \"\"\"Rotates an n-by-n square matrix 90 degrees clockwise.\n\n    Args:\n        matrix: A list of lists of integers representing the square matrix.\n\n    Returns:\n        A new list of lists representing the rotated matrix.\n    \"\"\"\n    # Handle the case of an empty matrix\n    if not matrix or not matrix[0]:\n        return []\n\n    # Reversing the rows of the matrix first, then zipping them,\n    # effectively performs a 90-degree clockwise rotation.\n    return [list(row) for row in zip(*matrix[::-1])]\n```"},{"panel":"frontier","author":"Grok","display":"Grok 4.3","lang":"es","genre":"essay","source":"langllm","prompt":"L:P12","text":"La prohibición de vehículos privados en los centros urbanos representa una medida imprescindible para recuperar la habitabilidad de las ciudades y priorizar el bienestar colectivo sobre la comodidad individual del automóvil. Esta decisión no solo responde a la urgencia de reducir la dependencia del transporte motorizado, sino que también genera beneficios tangibles que se manifiestan en el corto y medio plazo.\n\nAl retirar el tráfico de coches particulares, el espacio viario que antes ocupaban carreteras y aparcamientos queda liberado para otros usos más productivos y saludables. Las aceras pueden ampliarse considerablemente, permitiendo un flujo peatonal cómodo y seguro, mientras que se habilitan carriles exclusivos para bicicletas y zonas de estancia que favorecen el comercio minorista. Los escaparates de las tiendas ganan visibilidad directa desde la calle, sin la barrera del tráfico constante, y los propietarios pueden instalar terrazas o exposiciones que atraen a un público más diverso. Esta redistribución transforma el centro en un espacio vivo donde caminar o pedalear resulta placentero, incrementando el tiempo de permanencia de los visitantes y estimulando el consumo local.\n\nEn paralelo, la mejora de la calidad del aire se produce de forma notable en apenas unos meses. La reducción drástica de emisiones de dióxido de carbono, óxidos de nitrógeno y partículas finas disminuye los niveles de contaminación atmosférica, lo que se traduce en menos problemas respiratorios entre residentes y trabajadores. Al mismo tiempo, la eliminación del ruido constante de motores y cláxones genera un entorno acústico más tranquilo que favorece el descanso, la concentración y las interacciones sociales. Estudios de monitorización en zonas recientemente peatonalizadas confirman caídas de hasta un treinta por ciento en contaminantes y una percepción subjetiva de mayor bienestar que refuerza el apoyo ciudadano a la medida.\n\nLa experiencia de ciudades que han implementado restricciones similares demuestra que estos cambios no perjudican la actividad comercial, sino que la potencian. En lugares como el centro histórico de Pontevedra o las zonas de bajas emisiones de Oslo, la afluencia de peatones y ciclistas ha aumentado de manera sostenida, elevando las ventas de comercios minoristas en lugar de provocar el descenso que algunos temían. Los datos muestran que los visitantes permanecen más tiempo y gastan más cuando el entorno resulta agradable y accesible, desmintiendo el mito de que el coche es indispensable para el comercio urbano. En consecuencia, la prohibición de vehículos privados en los centros consolida un modelo de ciudad más sostenible, saludable y económicamente vibrante."},{"panel":"openweight","author":"Qwen","display":"Qwen2.5-7B-Instruct","lang":"en","genre":"prose","source":"local","prompt":"H5","text":"The hard problem of consciousness—why physical processes give rise to subjective experience at all—is a distinct challenge from the easier task of explaining how the brain functions. While functionalist theories offer compelling explanations for cognitive processes, they fall short when it comes to elucidating the qualitative aspects of experience. These theories describe what the brain does in terms of information processing and behavioral outputs but fail to account for the “what it is like” aspect of consciousness, which remains a mystery. The subjective qualities of experience, such as the taste of an apple or the feeling of joy, are not reducible to functional descriptions alone. They exist beyond mere causal relationships and mechanisms, highlighting the limitations of functionalism in capturing the essence of consciousness.\n\nMoreover, the conceivability of philosophical zombies—hypothetical beings with the same physical structure as conscious humans but without any subjective experience—provides a powerful argument against the idea that phenomenal consciousness is logically entailed by physical descriptions. If we can imagine beings physically identical to us but lacking any subjective experiences, it follows that there must be some property of consciousness that cannot be derived from or reduced to physical properties alone. This demonstrates that the identity between physical and phenomenal properties is a contingent one, not a necessary one. In other words, while it might be true that certain physical states correspond to certain conscious states, this correspondence is not a logical necessity but rather a factual one. Therefore, even if physicalism were true, it would not entail the existence of phenomenal consciousness, suggesting that the two are fundamentally different in nature.\n\nFurthermore, Mary’s Room thought experiment further elucidates the epistemic irreducibility of phenomenal properties. In this scenario, Mary, a neuroscientist who has spent her entire life in a room where she has learned all the physical facts about color and vision through books but has never seen actual colors, gains new knowledge when she leaves the room and sees red. This experiment demonstrates that complete physical knowledge does not necessarily entail complete knowledge of phenomenal properties. It suggests that there is more to consciousness than just the physical processes involved; it includes an irreducibly subjective dimension that cannot be fully captured by physical descriptions alone. This epistemic irreducibility means that while we may be able to understand the physical basis of consciousness, we will still lack full knowledge of what it is like to have those experiences unless we also consider their subjective aspects. Thus, the ontological unity of mind and body is not established through physical knowledge alone, reinforcing the need for a more comprehensive understanding of consciousness that goes beyond purely physical explanations."},{"panel":"openweight","author":"Llama","display":"Llama-3.1-8B-Instruct","lang":"en","genre":"code","source":"local","prompt":"C9","text":"```python\ndef rotate_matrix(matrix: list[list[int]]) -> list[list[int]]:\n    \"\"\"\n    Rotate a square matrix 90 degrees clockwise.\n\n    Args:\n        matrix (list[list[int]]): An n-by-n square matrix.\n\n    Returns:\n        list[list[int]]: A new matrix rotated 90 degrees clockwise.\n    \"\"\"\n    # Check if the input is a square matrix\n    n = len(matrix)\n    if any(len(row) != n for row in matrix) or n == 0:\n        raise ValueError(\"Input must be a square matrix\")\n\n    # Use the built-in zip function to transpose the matrix\n    # The * operator is used to unpack the matrix into arguments for zip\n    # The reversed function is used to reverse the order of the rows\n    transposed = zip(*matrix)\n    rotated = reversed(list(transposed))\n\n    # Convert the rotated zip object to a list of lists\n    # The list function is used to convert the zip object to a list\n    # The map function is used to convert each element in the list to a list\n    return list(map(list, rotated))\n```"},{"panel":"openweight","author":"Phi","display":"Phi-4-mini-instruct","lang":"en","genre":"prose","source":"local","prompt":"H5","text":"The philosophical debate surrounding consciousness is deeply complex and unresolved, particularly when examining the explanatory power of physicalist and functionalist theories. At the core of this debate lies the \"hard problem\" of consciousness, famously articulated by philosopher David Chalmers. This problem asks why and how physical processes in the brain give rise to subjective experiences, or phenomenally conscious states. The distinction between the easy problems and the hard problem is crucial. Easy problems pertain to explaining cognitive functions and processes, which functionalism and physicalism address by detailing how mental states correlate with physical states and how cognitive functions operate. However, these theories fall short when confronted with the hard problem; they explain *how* the brain functions but not *what* it is like to experience consciousness.\n\nThe conceivability of philosophical zombies furthers this point. A philosophical zombie is a hypothetical being that is physically indistinguishable from a human being, yet lacks phenomenal experience. If we could imagine such creatures, it suggests that phenomenal consciousness is not logically entailed by physical description. This implies that there is a contingent identity between physical and phenomenal properties; that is, the relationship between physical processes and phenomenal experiences is not necessarily fixed and could be different in other possible worlds. Thus, the notion of zombies challenges the idea that physical processes alone suffice to explain consciousness.\n\nMoreover, consider the thought experiment known as \"Mary's Room.\" In this scenario, Mary, a neuroscientist, has complete physical knowledge of a room and all the objects within it. She then learns the color of red by observing someone in a red room. When she sees red for the first time, she experiences a phenomenal sensation. This thought experiment shows that even with full physical knowledge, Mary still gains new phenomenal information when she sees red. This indicates that phenomenal facts are epistemically irreducible to physical facts, even though the ontological dualism—where physical and phenomenal properties are considered distinct—may not be strictly necessary. Hence, while physicalism and functionalism might explain cognitive processes, they do not fully address the nature of consciousness itself.\n\nTherefore, consciousness poses an explanatory challenge that current physicalist and functionalist frameworks do not fully resolve. The hard problem remains elusive, philosophical zombies demonstrate the contingent nature of consciousness, and thought experiments like Mary's Room reveal the epistemic gap between physical knowledge and phenomenal experience. These points collectively affirm that any current explanation of consciousness that relies solely on physical processes and functions leaves the hard problem of consciousness—why physical processes give rise to subjective experiences—unanswered."}]</script>
+<script>
+/* Attribution models that run in the browser (and in Node, for the parity test).
+ *
+ * Two methods, ported from the research code so they give the same numbers:
+ *   charNgram  TF-IDF over character 1-4-grams + multinomial logistic regression
+ *              (scikit-learn TfidfVectorizer(analyzer="char", lowercase=False,
+ *              sublinear_tf=True) + LogisticRegression). Any language.
+ *   style      the 18 CompLLM surface features (legacy/compllm/src/features.py)
+ *              + standardisation + multinomial logistic regression. English.
+ *
+ * Python's regular expressions are Unicode-aware; JavaScript's \w, \b and \s are
+ * not, so the Python character classes are spelled out below. site/build/parity.js
+ * checks every function here against Python output on real texts.
+ */
+(function (root) {
+  "use strict";
+
+  // Python str.isspace(), which is what Python's \s matches in a str pattern.
+  const PY_SPACE = "\\t\\n\\v\\f\\r \\x1c-\\x1f\\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000";
+  const S = `[${PY_SPACE}]`;
+  // Python's \w for str: letters, numbers (str.isalnum) and underscore. Marks are not included.
+  const W = "[\\p{L}\\p{N}_]";
+  const B = `(?:(?<=${W})(?!${W})|(?<!${W})(?=${W}))`;   // Python's \b
+
+  const RE_MULTISPACE = new RegExp(`${S}${S}+`, "gu");     // sklearn's _white_spaces
+  const RE_WORD = new RegExp(`${B}[\\p{L}\\p{N}_'\\-]+${B}`, "gu");
+  const RE_SENT = new RegExp(`[.!?]+(?:${S}|$)`, "u");
+  const RE_PARA = new RegExp(`\\n${S}*\\n`, "u");
+  const BE = "(?:is|are|was|were|be|been|being|am|get|gets|got|becomes|became)";
+  const RE_PASSIVE = new RegExp(
+    `${B}${BE}${B}${S}+(?:${W}+ly${S}+)?${B}${W}+(?:ed|en|wn|ne|de)${B}`, "giu");
+  const RE_TRIM = new RegExp(`^${S}+|${S}+$`, "gu");
+
+  const pyStrip = (t) => (t || "").replace(RE_TRIM, "");
+  const cpLen = (s) => Array.from(s).length;
+  const countSub = (t, sub) => t.split(sub).length - 1;
+  const mean = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : NaN);
+  const pstd = (a) => { const m = mean(a); return Math.sqrt(mean(a.map((x) => (x - m) ** 2))); };
+
+  function softmax(z) {
+    const m = Math.max(...z);
+    const e = z.map((v) => Math.exp(v - m));
+    const s = e.reduce((a, b) => a + b, 0);
+    return e.map((v) => v / s);
+  }
+
+  // ---------------------------------------------------------------- n-grams
+  function prepareNgram(model) {
+    if (!model._index) {
+      model._index = new Map(model.vocab.map((g, i) => [g, i]));
+      // Softmax is unchanged by subtracting a per-feature constant across classes;
+      // centring makes each class's weight read as "toward this model vs the average".
+      const k = model.coef.length;
+      model._centred = model.coef.map((row) => row.map((w, j) => {
+        let s = 0; for (let c = 0; c < k; c++) s += model.coef[c][j]; return w - s / k;
+      }));
+    }
+    return model;
+  }
+
+  function ngramCounts(text, model) {
+    const doc = Array.from(text.replace(RE_MULTISPACE, " "));
+    const [lo, hi] = model.ngram_range;
+    const counts = new Map();
+    for (let n = lo; n <= Math.min(hi, doc.length); n++) {
+      for (let i = 0; i + n <= doc.length; i++) {
+        const j = model._index.get(doc.slice(i, i + n).join(""));
+        if (j !== undefined) counts.set(j, (counts.get(j) || 0) + 1);
+      }
+    }
+    return counts;
+  }
+
+  function charNgram(text, model) {
+    prepareNgram(model);
+    const counts = ngramCounts(text, model);
+    const x = new Map();
+    let norm = 0;
+    for (const [j, c] of counts) {
+      const v = (1 + Math.log(c)) * model.idf[j];
+      x.set(j, v); norm += v * v;
+    }
+    norm = Math.sqrt(norm) || 1;
+    const z = model.intercept.slice();
+    for (const [j, v] of x) {
+      const xv = v / norm; x.set(j, xv);
+      for (let c = 0; c < z.length; c++) z[c] += model.coef[c][j] * xv;
+    }
+    const proba = softmax(z);
+    const top = proba.indexOf(Math.max(...proba));
+    const evidence = (c, n) => [...x].map(([j, xv]) => ({ gram: model.vocab[j], w: xv * model._centred[c][j] }))
+      .sort((a, b) => b.w - a.w).slice(0, n).filter((e) => e.w > 0);
+    return { proba, top, matched: counts.size, evidence };
+  }
+
+  // Per-character share of the score for class c, for the fingerprint view.
+  // Each matched n-gram's contribution (its tf-idf value times its centred weight,
+  // split evenly over its occurrences) is spread over the characters it covers.
+  // The characters' weights sum to class c's logit minus the class average
+  // (intercepts aside). A whitespace run that scikit-learn collapses to one space
+  // splits that space's weight evenly over its characters.
+  const RE_SPACE_CHAR = new RegExp(`^${S}$`, "u");
+  function fingerprint(text, model, c) {
+    prepareNgram(model);
+    const orig = Array.from(text);
+    const norm = [], span = [];
+    for (let i = 0; i < orig.length;) {
+      if (RE_SPACE_CHAR.test(orig[i])) {
+        let j = i;
+        while (j < orig.length && RE_SPACE_CHAR.test(orig[j])) j++;
+        if (j - i >= 2) { norm.push(" "); span.push([i, j]); i = j; continue; }
+      }
+      norm.push(orig[i]); span.push([i, i + 1]); i++;
+    }
+    const [lo, hi] = model.ngram_range;
+    const counts = new Map(), hits = [];
+    for (let n = lo; n <= Math.min(hi, norm.length); n++) {
+      for (let i = 0; i + n <= norm.length; i++) {
+        const j = model._index.get(norm.slice(i, i + n).join(""));
+        if (j !== undefined) { counts.set(j, (counts.get(j) || 0) + 1); hits.push(i, n, j); }
+      }
+    }
+    const val = new Map();
+    let ss = 0;
+    for (const [j, cnt] of counts) { const v = (1 + Math.log(cnt)) * model.idf[j]; val.set(j, v); ss += v * v; }
+    const nrm = Math.sqrt(ss) || 1;
+    const w = new Float64Array(norm.length);
+    for (let h = 0; h < hits.length; h += 3) {
+      const i = hits[h], n = hits[h + 1], j = hits[h + 2];
+      const share = ((val.get(j) / nrm) * model._centred[c][j]) / counts.get(j) / n;
+      for (let t = 0; t < n; t++) w[i + t] += share;
+    }
+    const out = new Float64Array(orig.length);
+    span.forEach(([a, b], k) => { for (let t = a; t < b; t++) out[t] = w[k] / (b - a); });
+    return { chars: orig, weights: out };
+  }
+
+  // ---------------------------------------------------------- style features
+  function countSyllables(word) {
+    const w = word.toLowerCase().replace(/[^a-z]/g, "");
+    if (!w) return 0;
+    if (w.length <= 3) return 1;
+    let n = (w.match(/[aeiouy]+/g) || []).length;
+    const ends = (...xs) => xs.some((s) => w.endsWith(s));
+    if (w.endsWith("e") && !ends("le", "ee", "ye") && n > 1) n -= 1;
+    if (ends("es", "ed") && n > 1 && !ends("ies", "ted", "ded")) n -= 1;
+    return Math.max(n, 1);
+  }
+
+  const HEDGES = new Set(("may might could perhaps possibly arguably seemingly apparently presumably " +
+    "likely unlikely often sometimes generally typically usually somewhat relatively fairly rather " +
+    "quite suggest suggests indicate indicates appear appears tend tends roughly approximately " +
+    "potentially conceivably probably assume assumes").split(" "));
+
+  const words = (t) => t.match(RE_WORD) || [];
+
+  function styleFeatures(raw) {
+    const text = pyStrip(raw);
+    const ws = words(text);
+    const lower = ws.map((w) => w.toLowerCase());
+    const nW = Math.max(ws.length, 1);
+    let sents = text.split(RE_SENT).filter((s) => s && pyStrip(s)).map(pyStrip);
+    if (!sents.length) sents = [pyStrip(text)];
+    const sentLens = sents.map((s) => words(s).length);
+    let paras = text.split(RE_PARA).filter((p) => pyStrip(p));
+    if (!paras.length) paras = [text];
+    const counts = new Map();
+    for (const w of lower) counts.set(w, (counts.get(w) || 0) + 1);
+    let hapax = 0; for (const c of counts.values()) if (c === 1) hapax++;
+    const per100 = (k) => (100 * k) / nW;
+    const nS = sents.length;
+    const syl = ws.reduce((a, w) => a + countSyllables(w), 0);
+    const complex = ws.filter((w) => countSyllables(w) >= 3).length;
+    return {
+      word_count: ws.length,
+      ttr: counts.size / nW,
+      hapax_rate: hapax / nW,
+      avg_word_len: ws.length ? mean(ws.map(cpLen)) : 0,
+      avg_sent_len: mean(sentLens),
+      sent_len_sd: pstd(sentLens),
+      sent_count: sents.length,
+      passive_rate: per100((text.match(RE_PASSIVE) || []).length),
+      flesch_reading_ease: 206.835 - 1.015 * (nW / Math.max(nS, 1)) - 84.6 * (syl / nW),
+      flesch_kincaid_grade: 0.39 * (nW / Math.max(nS, 1)) + 11.8 * (syl / nW) - 15.59,
+      gunning_fog: 0.4 * (nW / Math.max(nS, 1) + (100 * complex) / nW),
+      hedge_per_100w: per100(lower.filter((w) => HEDGES.has(w)).length),
+      para_count: paras.length,
+      avg_para_len: mean(paras.map((p) => words(p).length)),
+      comma_per_100w: per100(countSub(text, ",")),
+      emdash_per_100w: per100(countSub(text, "—") + countSub(text, "--")),
+      colon_per_100w: per100(countSub(text, ":")),
+      semicolon_per_100w: per100(countSub(text, ";")),
+    };
+  }
+
+  function style(text, model) {
+    const f = styleFeatures(text);
+    const zf = model.features.map((name, j) => (f[name] - model.mean[j]) / (model.scale[j] || 1));
+    const z = model.intercept.map((b, c) => b + model.coef[c].reduce((a, w, j) => a + w * zf[j], 0));
+    const proba = softmax(z);
+    const top = proba.indexOf(Math.max(...proba));
+    const k = model.coef.length;
+    const push = (c) => model.features.map((name, j) => {
+      let s = 0; for (let d = 0; d < k; d++) s += model.coef[d][j];
+      return { feature: name, value: f[name], z: zf[j], w: zf[j] * (model.coef[c][j] - s / k) };
+    });
+    return { proba, top, features: f, push };
+  }
+
+  const api = { charNgram, fingerprint, style, styleFeatures, countSyllables };
+  if (typeof module === "object" && module.exports) module.exports = api;
+  else root.Attribution = api;
+})(typeof globalThis !== "undefined" ? globalThis : this);
+
+</script>
+<script>
+(() => {
+  "use strict";
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const pct = (x, d = 1) => (x == null ? "-" : (100 * x).toFixed(d) + "%");
+  const pad = (s, n) => String(s).padEnd(n);
+  const lpad = (s, n) => String(s).padStart(n);
+  const bar = (p, w = 30) => { const k = Math.round(p * w); return "█".repeat(k) + "░".repeat(w - k); };
+  const RES = JSON.parse($("#results-data").textContent);
+  const EVAL = JSON.parse($("#eval-data").textContent);
+  const SAMPLES = JSON.parse($("#samples-data").textContent);
+  const REPO = "https://github.com/adrian-erlikhman/llm-attribution/blob/main/";
+  const LANG = { en: "english", es: "spanish", ja: "japanese", zh: "chinese", ru: "russian", tr: "turkish", hi: "hindi" };
+  const TABS = ["attribute", "results", "methods", "code"];
+  const models = {};
+  const st = { panel: "frontier", sample: 0 };
+  const line = (html, cls = "") => `<div class="line ${cls}">${html}</div>`;
+  const pre = (html) => `<div class="pre">${html}</div>`;
+  const gap = `<div class="gap"></div>`;
+
+  // ------------------------------------------------------------ commands
+  const tabs = [...document.querySelectorAll("nav button")];
+  function show(id) {
+    tabs.forEach((t) => (t.dataset.tab === id ? t.setAttribute("aria-current", "page") : t.removeAttribute("aria-current")));
+    TABS.forEach((s) => ($("#" + s).hidden = s !== id));
+    try { history.replaceState(null, "", "#" + id); } catch (e) {}
+  }
+  tabs.forEach((t) => t.addEventListener("click", () => show(t.dataset.tab)));
+  if (TABS.includes(location.hash.slice(1))) show(location.hash.slice(1));
+
+  // ------------------------------------------------------------ input
+  const ta = $("#text"), sel = $("#sample");
+  sel.innerHTML = `<option value="">none</option>` + SAMPLES.map((s, i) =>
+    `<option value="${i}">${esc(s.display)}, ${s.genre === "code" ? "code" : LANG[s.lang]}</option>`).join("");
+  function loadSample(i) {
+    st.sample = i; sel.value = i == null ? "" : String(i);
+    if (i != null) { st.panel = SAMPLES[i].panel; ta.value = SAMPLES[i].text; }
+    update();
+  }
+  sel.addEventListener("change", () => loadSample(sel.value === "" ? null : +sel.value));
+  ["frontier", "openweight"].forEach((p) => $("#p-" + p).addEventListener("click", () => { st.panel = p; update(); }));
+  $("#clear").addEventListener("click", () => { ta.value = ""; loadSample(null); ta.focus(); });
+  let timer;
+  ta.addEventListener("input", () => { st.sample = null; sel.value = ""; clearTimeout(timer); timer = setTimeout(update, 200); });
+  function readFile(f) {
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => { ta.value = String(r.result); st.sample = null; sel.value = ""; update(); };
+    r.readAsText(f);
+  }
+  $("#file").addEventListener("change", (e) => readFile(e.target.files[0]));
+  ta.addEventListener("dragover", (e) => { e.preventDefault(); ta.classList.add("drag"); });
+  ta.addEventListener("dragleave", () => ta.classList.remove("drag"));
+  ta.addEventListener("drop", (e) => { e.preventDefault(); ta.classList.remove("drag"); readFile(e.dataTransfer.files[0]); });
+
+  // ------------------------------------------------------------ attribute
+  const isEnglish = (text) => {
+    const letters = text.match(/\p{L}/gu) || [];
+    if (letters.length < 20) return false;
+    const ascii = letters.filter((c) => /[A-Za-z]/.test(c)).length / letters.length;
+    const words = text.toLowerCase().match(/[a-z']+/g) || [];
+    const common = words.filter((w) => ["the", "and", "of", "to", "is", "in", "that", "a"].includes(w)).length;
+    return ascii > 0.9 && common / Math.max(words.length, 1) > 0.05;
+  };
+  const bucket = (list, v) => list.find((b) => v >= b.lo && v < b.hi) || list[list.length - 1];
+  const fmt = (v) => (Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2));
+
+  function ranked(proba, names) {
+    const order = proba.map((_, i) => i).sort((a, b) => proba[b] - proba[a]);
+    const w = Math.max(...names.map((n) => n.length)) + 2;
+    return order.map((i, r) => {
+      const row = `${pad(names[i], w)}${proba[i].toFixed(2)}  ${bar(proba[i])}`;
+      return r === 0 ? `<span class="b">${esc(row)}</span>` : esc(row);
+    }).join("\n");
+  }
+
+  function update() {
+    ["frontier", "openweight"].forEach((p) => $("#p-" + p).setAttribute("aria-pressed", String(p === st.panel)));
+    const text = ta.value, chars = text.trim().length, words = (text.trim().match(/\S+/g) || []).length;
+    const en = isEnglish(text);
+    $("#count").textContent = `${chars.toLocaleString()} chars, ${words.toLocaleString()} words${chars >= 20 ? (en ? ", english" : ", not english") : ""}`;
+    $("#flags").textContent = `--panel ${st.panel}`;
+    const out = $("#out"), ng = models[st.panel + "_ngram"], sm = models[st.panel + "_style"];
+    if (!ng) { out.innerHTML = line("loading classifiers (4 MB)...", "dim"); return; }
+    if (chars < 20) { out.innerHTML = line("waiting for text.", "dim"); return; }
+
+    const r = Attribution.charNgram(text, ng), ev = EVAL[st.panel + "_ngram"];
+    const lenB = bucket(ev.by_length_chars, chars), calB = bucket(ev.calibration, r.proba[r.top]);
+    const s = st.sample != null ? SAMPLES[st.sample] : null;
+    const k = (label) => `<span class="dim">${pad(label, 13)}</span>`;
+    let h = line(`${k("verdict")}<span class="b">${esc(ng.display[r.top])}</span>  <span class="dim">p = ${r.proba[r.top].toFixed(2)}</span>`);
+    if (s && s.panel === st.panel) {
+      const ok = ng.classes[r.top] === s.author;
+      h += line(`${k("truth")}${esc(s.display)}  ${ok ? '<span class="g">correct</span>' : '<span class="r">wrong</span>'}  <span class="dim">(prompt ${esc(s.prompt)} was held out of training)</span>`);
+    } else if (s) {
+      h += line(`${k("truth")}${esc(s.display)}  <span class="dim">(not in this panel)</span>`);
+    }
+    h += line(`${k("method")}character 1-4-grams, logistic regression, ${ng.vocab.length.toLocaleString()} features`);
+    h += gap + pre(ranked(r.proba, ng.display)) + gap;
+    const calTxt = calB.lo === 0 ? "under " + calB.hi.toFixed(1) : calB.hi >= 1 ? "over " + calB.lo.toFixed(1) : calB.lo.toFixed(1) + "-" + calB.hi.toFixed(1);
+    h += line(`${k("reliability")}${pct(lenB.acc, 0)} correct on held-out texts this long (n=${lenB.n}), ${pct(calB.acc, 0)} when top p was ${calTxt}. chance ${pct(ev.chance, 0)}.`);
+    if (chars < 400) h += line(`${k("warning")}<span class="y">short text. accuracy drops below about 400 chars.</span>`);
+    const grams = r.evidence(r.top, 14).map((g) => `<span class="y">"${esc(g.gram.replace(/\n/g, "\\n"))}"</span>`).join(" ");
+    h += line(`${k("evidence")}${grams || '<span class="dim">none</span>'}`);
+    if (en) {
+      const sr = Attribution.style(text, sm), sev = EVAL[st.panel + "_style"];
+      const push = sr.push(sr.top).sort((a, b) => b.w - a.w);
+      const prof = sm.profile[sm.classes[sr.top]];
+      const rows = [`${pad("feature", 22)}${lpad("text", 9)}${lpad("model avg", 11)}${lpad("push", 8)}`,
+        ...push.map((p) => `${pad(p.feature, 22)}${lpad(fmt(p.value), 9)}${lpad(fmt(prof[p.feature][0]), 11)}${lpad((p.w > 0 ? "+" : "") + p.w.toFixed(2), 8)}`)];
+      h += line(`${k("style")}${esc(sm.display[sr.top])} <span class="dim">p = ${sr.proba[sr.top].toFixed(2)}, 18 english features, ${pct(sev.overall.acc, 0)} held-out</span>`);
+      h += `<details><summary>features</summary>${pre(esc(rows.join("\n")))}</details>`;
+    } else {
+      h += line(`${k("style")}<span class="dim">skipped, english only</span>`);
+    }
+    h += gap + line("note: always picks one of the listed models. human text and other models get matched to the closest one.", "dim");
+    out.innerHTML = h;
+  }
+
+  async function loadModels() {
+    await Promise.all(["frontier_ngram", "frontier_style", "openweight_ngram", "openweight_style"].map(async (f) => {
+      const res = await fetch(`models/${f}.json`);
+      if (!res.ok) throw new Error(`models/${f}.json: HTTP ${res.status}`);
+      models[f] = await res.json();
+    }));
+  }
+
+  // ------------------------------------------------------------ results
+  function renderResults() {
+    const L = RES.likelihood, PR = RES.probes, LG = RES.langllm, S1 = RES.study1, ST = RES.steering;
+    const best = (o) => Math.max(...Object.values(o));
+    const block = (title, rows) => line(`<span class="b">${esc(title)}</span>`) + pre(esc(rows.join("\n"))) + gap;
+    const rowfmt = (a, b, c, d) => `${pad(a, 34)}${pad(b, 28)}${lpad(c, 7)}${lpad(d, 8)}`;
+    let h = gap;
+    h += block("accuracy by method, held-out prompts", [
+      rowfmt("method", "needs", "acc", "chance"),
+      rowfmt("likelihood, with prompt", "log-probs, every model", pct(L.with_prompt.raw.acc), "25%"),
+      rowfmt("likelihood, text only, z-scored", "log-probs, every model", pct(L.text_only.zscore.acc), "25%"),
+      rowfmt("hidden-state probe, best reader", "one open model", pct(best(PR.full.acc4)), "25%"),
+      rowfmt("char n-grams", "text", pct(PR.text_baselines_acc4.char_1_5), "25%"),
+      rowfmt("style features, random forest", "text", pct(S1.style_rf_openweight.pooled), "25%"),
+      rowfmt("style features, study 1", "text", pct(S1.style_rf_frontier.acc), "20%"),
+      rowfmt("char n-grams, this tool", "text", pct(EVAL.frontier_ngram.overall.acc), "20%"),
+      rowfmt("llm judge, lineup", "ask the model", pct(S1.judges_frontier.lineup), "20%"),
+      rowfmt("llm judge, one text", "ask the model", pct(S1.judges_frontier.single), "20%"),
+      "",
+      "rows 1-5: 4 open-weight models. rows 6-9: 5 frontier models.",
+    ]);
+    h += block("likelihood confusion, text only, z-scored (rows = true author, n = 480)", [
+      pad("", 10) + L.labels.map((l) => lpad(l, 9)).join(""),
+      ...L.labels.map((l, i) => pad(l, 10) + L.text_only.zscore.confusion[i].map((v) => lpad(v, 9)).join("")),
+    ]);
+    h += block("hidden-state probes, 4-way accuracy by reader", [
+      `${pad("reader", 10)}${lpad("full", 8)}${lpad("32 words", 10)}${lpad("own auc", 10)}  strongest peer`,
+      ...PR.readers.map((r) => { const v = PR.full.self_vs_peer[r];
+        return `${pad(r, 10)}${lpad(pct(PR.full.acc4[r]), 8)}${lpad(pct(PR.first_32_words.acc4[r]), 10)}${lpad(v.self.toFixed(3), 10)}  ${v.strongest_peer} ${v.strongest_peer_auc.toFixed(3)}`; }),
+      "", "no model reads its own texts better than its strongest peer.",
+    ]);
+    h += block("langllm, 5-way accuracy by language, chance 20%", [
+      `${pad("language", 10)}${lpad("char", 7)}${lpad("word", 7)}${lpad("style", 7)}${lpad("best judge", 12)}`,
+      ...LG.by_language.map((r) => `${pad(r.name.toLowerCase(), 10)}${lpad(pct(r.char_ngram, 0), 7)}${lpad(pct(r.word_ngram, 0), 7)}${lpad(pct(r.features, 0), 7)}${lpad(pct(r.judge_best, 0), 12)}`),
+    ]);
+    h += block("steering at a late layer, change in log-odds of yes per unit", [
+      `${pad("judge", 9)}${lpad("own-author", 11)}${lpad("yes ctrl", 10)}  random 95%`,
+      ...Object.entries(ST.judges).map(([j, v]) => `${pad(j, 9)}${lpad((v.author > 0 ? "+" : "") + v.author.toFixed(2), 11)}${lpad("+" + v.yes_control.toFixed(2), 10)}  [${v.null_lo.toFixed(2)}, ${v.null_hi.toFixed(2)}]`),
+      "", "the yes direction moves every judge. the own-author direction never makes it say yes.",
+    ]);
+    h += block("this tool's classifiers, 5-fold cv with prompts grouped", [
+      `${pad("classifier", 20)}${lpad("acc", 8)}${lpad("n", 7)}${lpad("chance", 8)}`,
+      ...["frontier_ngram", "frontier_style", "openweight_ngram", "openweight_style"].map((k) =>
+        `${pad(k, 20)}${lpad(pct(EVAL[k].overall.acc), 8)}${lpad(EVAL[k].overall.n, 7)}${lpad(pct(EVAL[k].chance, 0), 8)}`),
+    ]);
+    h += line("sources: self-recognition-peer-baseline/results, LangLLM/results, legacy/compllm/results/wllfm, site/models/eval.json", "dim");
+    $("#res").innerHTML = h;
+  }
+
+  function renderMethods() {
+    const L = RES.likelihood, PR = RES.probes;
+    const best = (o) => Math.max(...Object.values(o)), worst = (o) => Math.min(...Object.values(o));
+    $("#meth").innerHTML = gap +
+      line(`<span class="b">this tool</span>    char n-grams and style features, trained on 2,589 texts, run in your browser.`) +
+      line(`             pasted text is never sent anywhere.`, "dim") + gap +
+      line(`<span class="b">likelihood</span>   ${pct(L.with_prompt.raw.acc, 0)} with prompt, ${pct(L.text_only.zscore.acc)} text only. needs log-probs from every candidate. gpu.`) +
+      pre(`<span class="dim">$</span> python examples/likelihood_attribution.py path/to/self-recognition-peer-baseline
+<span class="dim">$</span> python legacy/compllm/src/revision/score_likelihood.py`) + gap +
+      line(`<span class="b">probe</span>        ${pct(worst(PR.full.acc4))}-${pct(best(PR.full.acc4))}. needs one open model's activations and labelled texts. gpu.`) +
+      pre(`<span class="dim">$</span> python src/wllfm/extract_states.py
+<span class="dim">$</span> python src/wllfm/probe.py --boot 2000`) + gap +
+      line(`<span class="b">llm judge</span>    near chance. not included.`) + gap +
+      line(`limits: closed set of 9 models. 2026 snapshots. unedited text only. short texts are unreliable.`, "dim");
+  }
+
+  function renderCode() {
+    const rows = [
+      ["likelihood", "legacy/compllm/src/revision/backends.py#L300-L352", "HFBackend.score"],
+      ["likelihood, one text", "examples/likelihood_attribution.py", "attribute"],
+      ["hidden states", "legacy/compllm/src/wllfm/extract_states.py#L104-L146", "main"],
+      ["probe", "legacy/compllm/src/wllfm/probe.py#L80-L93", "oof_scores"],
+      ["char n-grams", "legacy/compllm/src/wllfm/robustness.py#L112-L131", "text_baselines"],
+      ["style, english", "legacy/compllm/src/features.py#L157-L193", "extract"],
+      ["style, any language", "legacy/langllm/langllm/features.py#L154-L219", "extract"],
+      ["judge prompts", "legacy/compllm/src/revision/conditions.py#L46-L116", "lineup_prompt"],
+      ["steering", "legacy/compllm/src/wllfm/steer2.py#L60-L87", "directions"],
+      ["this tool, training", "site/build/train_models.py", "train_ngram"],
+      ["this tool, browser", "site/attribution.js", "charNgram"],
+      ["everything", "ALGORITHMS.md", ""],
+    ];
+    $("#files").innerHTML = gap + rows.map(([m, f, fn]) =>
+      `<div class="pre">${esc(pad(m, 22))}<a href="${REPO + f}" target="_blank" rel="noopener">${esc(f.replace(/#.*/, ""))}</a>${fn ? `  <span class="dim">${esc(fn)}</span>` : ""}</div>`).join("");
+  }
+
+  renderResults();
+  renderMethods();
+  renderCode();
+  loadSample(0);
+  loadModels().then(update).catch((e) => {
+    $("#out").innerHTML = line(`<span class="r">error</span> ${esc(e.message)}. serve this folder over http (python -m http.server in site/).`);
+  });
+})();
+</script>
+
+</body>
+</html>
